@@ -33,6 +33,11 @@ SAFE_ENV = [
     "SHELL", "TZ", "COLORTERM", "SYSTEMROOT", "SystemRoot", "WINDIR", "COMSPEC",
     "PATHEXT", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS", "OS",
     "ProgramFiles", "ProgramFiles(x86)", "ProgramData", "CommonProgramFiles",
+    # Windows needs these to start processes inside an AppContainer (none are secrets;
+    # the folders they point to stay inaccessible unless granted).
+    "SystemDrive", "LOCALAPPDATA", "APPDATA", "HOMEDRIVE", "HOMEPATH", "ALLUSERSPROFILE",
+    "PUBLIC", "COMPUTERNAME", "USERDOMAIN", "ProgramW6432", "CommonProgramFiles(x86)",
+    "CommonProgramW6432", "DriverData",
 ]
 
 
