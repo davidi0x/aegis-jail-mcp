@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hydra-guard"
+dynamic = ["version"]
+description = "Run AI coding agents with a verified, minimal set of permissions (files, network, secrets)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+classifiers = [
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Security",
+]
+
+[project.scripts]
+hydra = "hydra_guard.cli:main"
+hydra-guard = "hydra_guard.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "hydra_guard.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["hydra_guard*"]

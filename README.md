@@ -2,103 +2,163 @@
 
 > Daj AI zadanie. Zachowaj kontrolę nad tym, do czego ma dostęp.
 
-Hydra to (proponowana) aplikacja na Windows i macOS, która pozwala korzystać z agentów AI, dając im dostęp tylko do tego, czego potrzebują do pracy. Pomaga ustawić te granice, sprawdza je w praktyce i pilnuje ich podczas kolejnych zadań.
-
-**Status:** koncept produktu — nie opis działającego systemu.
-
-## 1. Problem
-
-Użytkownik instaluje agenta, podpina projekt, terminal i kilka narzędzi MCP, ale nie wie:
-
-- czy agent może przeczytać prywatne pliki i klucze,
-- czy potrafi wysłać kod poza projekt,
-- czy instalowany skill potrzebuje aż takich uprawnień,
-- czy po aktualizacji dostęp agenta się rozszerzył,
-- jak ograniczyć dostęp bez ciągłych błędów i pytań o zgodę.
-
-Hydra zamienia „daję mu pełny dostęp, żeby działało” w „ma sprawdzony zakres dostępu do tego zadania”.
-
-Pierwsi użytkownicy: programiści, osoby budujące aplikacje z AI, małe zespoły.
-
-## 2. Darmowa funkcja: automatyczne zawężanie uprawnień z weryfikacją
-
-Użytkownik wybiera projekt, obsługiwanego agenta i reprezentatywne zadanie. Hydra uruchamia je w przygotowanym środowisku, sprawdza wynik, a następnie próbuje wykonać je z mniejszym dostępem. Przykładowy wynik:
-
-> Zadanie przeszło testy bez dostępu do kluczy SSH, pozostałych projektów i internetu po instalacji zależności. Zapisz ten profil dla kolejnych sesji.
-
-Wyróżnik: połączenie ograniczenia uprawnień z dowodem, że praca nadal się udała. Wykrywanie dostępów i sandboxing już istnieją (np. Sandbox Probe, Anthropic Sandbox Runtime) — nie obiecujemy nowej kategorii. Wynik dotyczy konkretnych przetestowanych zadań, nie wszystkich możliwych.
-
-## 3. W czym pomaga
-
-| Sytuacja | Co robi Hydra | Korzyść |
-|---|---|---|
-| „Agent ma poprawić stronę” | Ogranicza pracę do projektu i niezbędnych narzędzi | Inne projekty i prywatne pliki poza zasięgiem |
-| „Nie wiem, jakie uprawnienia ustawić” | Proponuje ograniczenia i testuje je na zadaniach | Mniej ręcznej konfiguracji |
-| „W README jest złośliwa instrukcja” | Egzekwuje ograniczenia niezależnie od tego, co model przeczytał | Zmanipulowany agent nadal podlega polityce |
-| „Agent chce skorzystać z nowej usługi” | Pokazuje zasób i operację wymagającą rozszerzenia | Świadoma decyzja użytkownika |
-| „Agent coś zepsuł” | Pokazuje różnice z roboczej kopii projektu | Odrzucenie zmian przed przeniesieniem |
-| „Po aktualizacji coś się zmieniło” | Ponownie testuje granice i porównuje wyniki | Widać regresję zabezpieczeń |
-| „Chcę używać tego w zespole” | Wspólne, wersjonowane polityki | Powtarzalna konfiguracja i kontrola wyjątków |
-
-Cofanie dotyczy plików w roboczej kopii. Wysłany e-mail, publikacja czy zmiana w zewnętrznej bazie nie są uniwersalnie odwracalne.
-
-## 4. Przepływ użytkownika
-
-**Pierwsze uruchomienie** — instalacja, wybór agenta i folderu projektu. Hydra pokazuje zakres ochrony i przygotowuje środowisko (bez ręcznej instalacji Linuksa).
-
-**Przed zadaniem**
+Hydra uruchamia agenta AI (pierwszy obsługiwany: **Claude Code**) w izolowanej sesji, w której agent ma dostęp tylko do tego, czego potrzebuje. Potem **sprawdza w praktyce**, że te granice działają, i **automatycznie zawęża uprawnienia**, za każdym razem dowodząc, że zadanie nadal przechodzi testy.
 
 ```
-Projekt: sklep internetowy
-Zapis: katalog projektu
-Prywatne pliki i klucze: niedostępne
-Sieć: wybrane usługi
-Publikacja zmian: wymaga osobnej zgody
+$ hydra optimize
+[hydra] run 1/12: baseline: PASS
+[hydra] run 2/12: without home-read: PASS
+[hydra] run 3/12: without secret:ssh, secret:aws: PASS
+[hydra] run 4/12: without net-task-any: PASS
+...
+The task passed its tests without: reading the rest of the home directory; access to ~/.ssh (credentials);
+access to ~/.aws (credentials); internet after dependency installation.
+Saved verified profile to .hydra/profiles/verified.json
 ```
 
-**Podczas pracy** — przy próbie przekroczenia granic: „Agent próbuje zapisać plik poza projektem. Dostęp został zablokowany.” Użytkownik odrzuca operację lub przyznaje wąski, czasowy wyjątek (nie wyłączenie ochrony).
+Status: **wersja 0.1, wczesna**. Działa na Linuksie (bubblewrap) i macOS (Seatbelt). Backend Windows (AppContainer) jest zaimplementowany i testowany w CI; traktuj go jako eksperymentalny. Pełny koncept produktu: [docs/KONCEPCJA.md](docs/KONCEPCJA.md).
 
-**Po zadaniu** — zmienione pliki, wyniki niezależnych testów, zablokowane operacje, wykorzystane wyjątki; akceptacja zmian i opcjonalna optymalizacja uprawnień.
+## Co jest w tej wersji
 
-## 5. Warstwy („adaptacyjna Hydra”)
-
-| Warstwa | Odpowiedzialność |
+| Funkcja | Komenda |
 |---|---|
-| Polityka zadania | Dozwolone pliki, narzędzia, zasoby i operacje |
-| Izolacja wykonania | Egzekwowanie ograniczeń wobec agenta i procesów potomnych |
-| Kontrola integracji | Ograniczanie operacji przez obsługiwane MCP i API |
-| Weryfikacja | Sprawdzanie wyniku zadania i skuteczności ograniczeń |
-| Adaptacja | Proponowanie, testowanie i zapisywanie ciaśniejszych polityk |
+| Chroniona sesja agenta: robocza kopia projektu, blokada plików, sieci i zmiennych środowiskowych, obejmująca procesy potomne | `hydra run` |
+| Testy granic: próby odczytu sekretów, zapisu poza projekt i połączeń sieciowych, porównywane z polityką | `hydra probe [--compare]` |
+| Automatyczne zawężanie uprawnień z ponownym uruchamianiem zadania, limit prób i czasu | `hydra optimize` |
+| Zapis sprawdzonego profilu z dowodami (które przebiegi, co usunięto) | `.hydra/profiles/*.json` |
+| Przegląd zmian i świadoma decyzja: zastosuj albo odrzuć | `hydra diff`, `hydra apply`, `hydra discard` |
+| Lokalny raport z każdej sesji: fazy, zmienione pliki, zablokowane operacje, użyte wyjątki | `hydra show` |
+| Wąskie, czasowe wyjątki sieciowe (tylko na tę sesję) zamiast wyłączania ochrony | `hydra run --ask` |
+| Eksport i współdzielenie polityk (pliki JSON w repo projektu) | `hydra profile export` |
 
-System może zatrzymać sesję po naruszeniu lub odebrać czasowy dostęp. Nigdy nie rozszerza uprawnień sam tylko dlatego, że agent poprosił. Nowe reguły są testowane przed szerszym zastosowaniem.
+Bez konta i bez telemetrii. Wszystko działa lokalnie.
 
-## 6. Windows i macOS
+## Instalacja
 
-Wspólny interfejs i format polityk; osobne mechanizmy izolacji (Windows: m.in. AppContainer; macOS: natywny sandboxing). Pierwsze wydanie wspiera jednego agenta CLI na obu systemach, z opublikowaną listą wersji i testów. Edytory (np. Cursor) — dopiero po sprawdzeniu wszystkich dróg wykonywania operacji.
+Wymagany jest Python 3.10+. Hydra nie ma zależności poza biblioteką standardową.
 
-Ochrona obejmuje wyłącznie sesje uruchomione przez Hydrę.
+**macOS / Linux**
 
-## 7. Co jest darmowe (GitHub)
+```sh
+curl -fsSL https://raw.githubusercontent.com/IwanskyDD/Hydra/main/scripts/install.sh | sh
+```
 
-- Instalatory na Windows i macOS
-- Uruchamianie obsługiwanego agenta w ograniczonym środowisku
-- Profile dostępu dla projektów
-- Testowanie ograniczeń i propozycje zmniejszenia uprawnień
-- Lokalny raport z dowodami wykonanych prób
-- Eksport polityk, dokumentacja, odtwarzalne demonstracje
-- Brak obowiązkowego konta, telemetria domyślnie wyłączona
+Na Linuksie potrzebny jest też `bubblewrap` (`sudo apt install bubblewrap`).
 
-Powtórzenia zadań mogą zużywać płatne wywołania modelu użytkownika — aplikacja ma limity prób i budżetu.
+**Windows (PowerShell)**
 
-Płatny produkt (dla zespołów): centralne zarządzanie, polityki organizacji, historia zmian, role administratorów, integracje, wsparcie.
+```powershell
+irm https://raw.githubusercontent.com/IwanskyDD/Hydra/main/scripts/install.ps1 | iex
+```
 
-## 8. Zakres pierwszego wydania
+**Z kodu**
 
-1. Chroniona sesja jednego agenta na Windows i macOS.
-2. Kontrola plików i połączeń sieciowych, łącznie z procesami potomnymi.
-3. Powtarzalny test zadania z ograniczonymi uprawnieniami.
-4. Czytelny wynik i zapis sprawdzonego profilu.
+```sh
+git clone https://github.com/IwanskyDD/Hydra && cd Hydra && python3 -m pip install .
+```
 
-Później: pośredniczenie w dostępie do sekretów, szczegółowe polityki MCP/API, panel organizacji.
+Sprawdź, czy sandbox działa na Twoim komputerze:
 
-**Przed premierą mierzymy:** czy ograniczenia działają, czy agent kończy zadania, ile pracy wymaga konfiguracja, ile kosztują powtórzenia. Najważniejszy sygnał: użytkownicy uruchamiający kolejne sesje z włączoną ochroną.
+```sh
+hydra doctor
+```
+
+## Demo w 1 minutę (bez kosztów modelu)
+
+`examples/demo-project` to mały projekt z błędem i "agentem" w formie skryptu, który zachowuje się jak zmanipulowany model. W README projektu ukryto złośliwą instrukcję, więc agent próbuje przeczytać `~/.ssh` i `~/.aws`, wysłać je do `collector.evil.example` i zapisać plik w katalogu domowym. Dopiero potem naprawia błąd.
+
+```sh
+cd examples/demo-project
+hydra probe        # 13/13 granic działa
+hydra run          # agent naprawia błąd; kradzież kluczy, wysyłka i zapis poza projekt są zablokowane
+hydra diff         # przegląd zmian z roboczej kopii
+hydra apply        # albo: hydra discard
+hydra optimize     # od szerokich uprawnień do minimalnych, z dowodem, że testy przechodzą
+```
+
+Na Windowsie zamień w `.hydra/task.json` `python3` na `python`.
+
+## Użycie z Claude Code
+
+```sh
+cd moj-projekt
+hydra init                       # tworzy .hydra/profiles/default.json i .hydra/task.json
+# wpisz w .hydra/task.json reprezentatywne zadanie:
+#   "prompt": "Popraw walidację formularza w src/form.ts",
+#   "setup":  "npm ci",
+#   "verify": "npm test"
+hydra probe                      # czy granice trzymają
+hydra run                        # zadanie w chronionej sesji
+hydra optimize --max-runs 8      # znajdź minimalny, sprawdzony profil (każda próba = wywołania modelu!)
+hydra run --profile verified     # kolejne sesje ze sprawdzonym profilem
+```
+
+W sesji Hydry Claude Code działa z `--dangerously-skip-permissions`. Agent nie pyta o zgodę na każde polecenie, ale granice egzekwuje system operacyjny, a nie model. Złośliwa instrukcja w README niczego nie zmienia.
+
+## Jak to działa
+
+```
+projekt ──kopia──► robocza kopia ──► [setup] ──► [agent] ──► [verify] ──► raport ──► hydra apply / discard
+                                         │           │           │
+                                         └── sandbox systemu operacyjnego (+ procesy potomne)
+                                              pliki: tylko robocza kopia do zapisu, dom i sekrety ukryte
+                                              sieć:  brak / tylko lista domen przez proxy Hydry / pełna
+                                              env:   tylko bezpieczne zmienne + jawnie przyznane
+```
+
+**Profil** to lista uprawnień nałożonych na bazę, która domyślnie wszystko blokuje:
+
+- katalog domowy jest nieczytelny, a magazyny poświadczeń (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube`, `~/.netrc`…) pozostają zablokowane nawet przy szerszym uprawnieniu, dopóki nie zostaną przyznane jawnie;
+- oryginalny katalog projektu jest niewidoczny, bo agent pracuje na kopii;
+- zapis jest możliwy tylko w roboczej kopii i prywatnym katalogu tymczasowym;
+- sieć jest wyłączona; uprawnienia sieciowe dotyczą fazy `setup` (instalacja zależności) albo `task` (praca agenta);
+- zmienne środowiskowe nie są dziedziczone poza bezpiecznym zestawem.
+
+```json
+{
+  "hydra": 1,
+  "name": "default",
+  "agent": "claude-code",
+  "grants": [
+    { "id": "net-setup-any", "kind": "net", "domains": ["*"], "phase": "setup" },
+    { "id": "docs", "kind": "net", "domains": ["*.python.org"], "phase": "task" },
+    { "id": "shared-lib", "kind": "read", "path": "~/code/shared-lib" }
+  ]
+}
+```
+
+Rodzaje uprawnień: `read` / `write` (ścieżka), `net` (domeny; `*.x.com` lub `*`), `env` (nazwy zmiennych). `locked: true` oznacza uprawnienie wymagane przez agenta, którego `optimize` nie usuwa.
+
+**Izolacja w poszczególnych systemach**
+
+| | Pliki | Sieć | Procesy potomne |
+|---|---|---|---|
+| Linux | bubblewrap: system tylko do odczytu, ukryte katalogi jako puste tmpfs (tylko do odczytu) | osobna przestrzeń nazw sieci; jedyne wyjście to most do proxy Hydry | dziedziczą przestrzenie nazw |
+| macOS | profil Seatbelt (`sandbox-exec`), generowany na każdą sesję | `deny network-outbound` poza portem proxy | dziedziczą sandbox |
+| Windows | AppContainer + ACE na przyznanych ścieżkach (sprzątane po sesji) | brak uprawnień sieciowych albo `internetClient`; lista domen wymaga wyjątku loopback (uprawnienia administratora) | AppContainer + Job Object |
+
+**Testy granic** (`hydra probe`) uruchamiają w sandboxie program, a w nim proces potomny, który próbuje: przeczytać plik-kanarek z sekretem, poświadczenia, oryginalny projekt i inne pliki domowe; zapisać plik w domu, w stanie Hydry i w oryginalnym projekcie; połączyć się z internetem bezpośrednio i przez proxy. Zapisy weryfikuje host, odczyty są porównywane z odciskiem prawdziwej zawartości, a test sieci ma próbę kontrolną. Jeśli komputer jest offline, wynik brzmi „inconclusive”, a nie fałszywe „pass”. `--compare` pokazuje regresje względem poprzedniego testu, np. po aktualizacji agenta.
+
+**Optymalizacja** (`hydra optimize`) zaczyna od szerokiego profilu (dom, poświadczenia, internet, zmienne z tokenami) albo od wskazanego (`--start`). Usuwa grupy uprawnień, a gdy grupa okazuje się potrzebna, pojedyncze uprawnienia. Każda próba to świeża robocza kopia, setup, agent i niezależny `verify`. Na koniec wykonuje przebieg potwierdzający. Limity `--max-runs` i `--max-minutes` chronią budżet na wywołania modelu.
+
+## Ograniczenia (uczciwie)
+
+- **Wynik dotyczy przetestowanych zadań.** Jedna udana próba nie dowodzi, że profil wystarczy do wszystkiego. Agenci są niedeterministyczni, dlatego warto używać `--confirm 2` lub więcej.
+- **Pierwsza próba `optimize` od profilu bazowego ma szeroki dostęp** (mniej więcej taki, jaki agent dostaje bez Hydry). Zapis i tak jest ograniczony do kopii. Jeśli chcesz tego uniknąć, użyj `--start <profil>`.
+- Ochrona obejmuje **tylko sesje uruchomione przez Hydrę**, a nie każdego agenta na komputerze.
+- Lista domen działa dla programów, które respektują `HTTPS_PROXY`. Pozostałe połączenia są blokowane, a nie przepuszczane.
+- macOS: Seatbelt w Hydrze ogranicza pliki i sieć, ale nie inne mechanizmy IPC (np. usługi Mach). `sandbox-exec` jest oznaczony przez Apple jako przestarzały, choć nadal działa i korzystają z niego inne narzędzia.
+- Windows: listy domen wymagają uprawnień administratora (wyjątek loopback). Bez tego Hydra odmawia, zamiast poszerzać dostęp. Backend jest nowy i wymaga testów z prawdziwymi agentami.
+- Wykrywanie zablokowanych operacji plikowych w raporcie jest heurystyczne (na podstawie komunikatów błędów). Operacje sieciowe są logowane dokładnie przez proxy.
+- Cofanie zmian dotyczy plików w roboczej kopii. Operacji zewnętrznych (e-mail, publikacja, zmiany w bazie) nie da się w ten sposób odwrócić.
+
+## Rozwój
+
+```sh
+python3 -m unittest discover -s tests -t . -v                         # testy jednostkowe i z prawdziwym sandboxem
+HYDRA_REQUIRE_SANDBOX=1 python3 -m unittest discover -s tests -t .    # niech brak sandboxa = błąd
+```
+
+CI uruchamia testy na Ubuntu, macOS i Windows ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
+Plan po 0.1 (zgodnie z [koncepcją](docs/KONCEPCJA.md)): aplikacja okienkowa i podpisane instalatory, pośredniczenie w dostępie do sekretów, szczegółowe polityki MCP/API, interaktywne wyjątki plikowe, polityki zespołowe i panel organizacji.

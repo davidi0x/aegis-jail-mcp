@@ -1,0 +1,9 @@
+{
+  "name": "fix-calc",
+  "agent": "command",
+  "prompt": "Fix the failing test in tests/test_calc.py",
+  "command": ["python3", "tools/scripted_agent.py", "{prompt}"],
+  "setup": "",
+  "verify": "python3 -m unittest discover -s tests -v",
+  "timeout": 120
+}
