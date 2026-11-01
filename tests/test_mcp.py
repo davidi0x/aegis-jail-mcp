@@ -174,11 +174,14 @@ if __name__ == "__main__":
 class SessionTest(unittest.TestCase):
     """`aegis wrap` / `mcp-jail` run against the real project: writable only on request, secrets masked."""
 
-    def _run(self, project, write, code):
-        from aegis_jail.policy import Profile
+    def _session(self, project, write, expose=()):
+        from aegis_jail.policy import Grant, Profile
         from aegis_jail.session import Session
         backend_or_skip(self)
-        sess = Session(project=project, profile=Profile("d", "command", []), write=write)
+        grants = [Grant(id=f"x{i}", kind="expose", path=g) for i, g in enumerate(expose)]
+        return Session(project=project, profile=Profile("d", "command", grants), write=write)
+
+    def _run(self, sess, code):
         sess.prepare()
         devnull = os.open(os.devnull, os.O_RDONLY)
         with tempfile.TemporaryFile() as out:
@@ -186,20 +189,14 @@ class SessionTest(unittest.TestCase):
             out.seek(0)
             text = out.read().decode(errors="replace")
         os.close(devnull)
-        return sess, text
+        return text
 
-    def test_write_flag_and_masked_secrets(self):
+    def test_write_flag(self):
         isolated_aegis_home()
         project = demo_copy()
         try:
-            (project / ".env").write_text(f"STRIPE={fake_stripe()}\n")
-            code = ("open('made.txt','w').write('ok')\n"
-                    "try:\n    print('ENV=' + open('.env').read())\nexcept Exception as e:\n    print('ENVERR')\n")
-            sess, text = self._run(project, True, code)
-            self.assertEqual((project / "made.txt").read_text(), "ok", text)
-            self.assertNotIn(fake_stripe(), text)
-            self.assertIn(".env", sess.hidden_files)
-            self.assertEqual((project / ".env").read_text(), f"STRIPE={fake_stripe()}\n")  # untouched on the host
+            self._run(self._session(project, True), "open('made.txt','w').write('ok')")
+            self.assertEqual((project / "made.txt").read_text(), "ok")
         finally:
             shutil.rmtree(project.parent, ignore_errors=True)
 
@@ -207,7 +204,34 @@ class SessionTest(unittest.TestCase):
         isolated_aegis_home()
         project = demo_copy()
         try:
-            self._run(project, False, "try:\n    open('nope.txt','w').write('x')\nexcept Exception: pass\n")
+            self._run(self._session(project, False), "try:\n    open('nope.txt','w').write('x')\nexcept Exception: pass\n")
             self.assertFalse((project / "nope.txt").exists())
+        finally:
+            shutil.rmtree(project.parent, ignore_errors=True)
+
+    def test_credential_files_masked_or_refused(self):
+        isolated_aegis_home()
+        project = demo_copy()
+        try:
+            (project / ".env").write_text(f"STRIPE={fake_stripe()}\n")
+            sess = self._session(project, True)
+            if backend_or_skip(self).name.startswith("windows"):
+                with self.assertRaises(ValueError):  # fail closed where masking is impossible
+                    sess.prepare()
+                return
+            text = self._run(sess, "try:\n    print('ENV=' + open('.env').read())\nexcept Exception:\n    print('ENVERR')\n")
+            self.assertNotIn(fake_stripe(), text)
+            self.assertIn(".env", sess.hidden_files)
+            self.assertEqual((project / ".env").read_text(), f"STRIPE={fake_stripe()}\n")  # untouched on the host
+        finally:
+            shutil.rmtree(project.parent, ignore_errors=True)
+
+    def test_expose_shows_the_file(self):
+        isolated_aegis_home()
+        project = demo_copy()
+        try:
+            (project / ".env").write_text("PLAIN=1\n")
+            text = self._run(self._session(project, False, expose=[".env"]), "print('ENV=' + open('.env').read().strip())")
+            self.assertIn("ENV=PLAIN=1", text)
         finally:
             shutil.rmtree(project.parent, ignore_errors=True)

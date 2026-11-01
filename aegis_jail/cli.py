@@ -349,6 +349,7 @@ def _with_command_grants(profile, argv, args):
         print(f"[aegis] {n}", file=sys.stderr)
     extra = [Grant(id=f"cli-read-{i}", kind="read", path=p) for i, p in enumerate(_split(args.allow_read))]
     extra += [Grant(id=f"cli-write-{i}", kind="write", path=p) for i, p in enumerate(_split(args.allow_write))]
+    extra += [Grant(id=f"cli-expose-{i}", kind="expose", path=g) for i, g in enumerate(_split(args.expose))]
     return profile.merged(grants + extra)
 
 
@@ -528,6 +529,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ask", action="store_true", help="ask before blocking a network host")
     p.add_argument("--allow-read", action="append", help="extra readable paths (comma-separated)")
     p.add_argument("--allow-write", action="append", help="extra writable paths (comma-separated)")
+    p.add_argument("--expose", action="append", help="credential-looking project files to show (e.g. .env)")
     p.add_argument("command", nargs=argparse.REMAINDER, help="-- command [args...]")
     p.set_defaults(fn=cmd_wrap)
 
@@ -545,6 +547,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-secrets", action="store_true", help="let tool arguments carry credentials")
     p.add_argument("--allow-read", action="append", help="extra readable paths (comma-separated)")
     p.add_argument("--allow-write", action="append", help="extra writable paths (comma-separated)")
+    p.add_argument("--expose", action="append", help="credential-looking project files to show (e.g. .env)")
     p.add_argument("command", nargs=argparse.REMAINDER, help="-- server command [args...]")
     p.set_defaults(fn=cmd_mcp_jail)
 

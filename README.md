@@ -416,6 +416,7 @@ Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it a
 - **Host allowlists go through an HTTP(S) proxy.** Programs that ignore `HTTPS_PROXY` are blocked, not let through. TLS contents are not inspected (that would mean intercepting your traffic), so keep allowlists small: an allowed host can still receive data.
 - **macOS:** the most dangerous Mach services are blocked, not all of them. **Decoys are Linux-only**: macOS and Windows hide the real files instead of replacing them.
 - **Linux seccomp** is a blocklist of known-dangerous syscalls, not a strict allowlist.
+- **Windows:** `aegis wrap` and `mcp-jail` refuse a project that contains credential files (`.env`, keys) unless you pass `--expose <name>`, because an AppContainer can't be denied one file inside a directory it shares. `aegis run` is not affected: it works on a copy that leaves those files out.
 - **The guard hook** is pattern matching for unsandboxed sessions. The real boundary is `aegis run` / `wrap` / `mcp-jail`.
 - **Detectors** (`aegis scan`, injection and poisoning filters) are heuristics: high recall, and they need human reading. Scanning this repository reports findings, because the demo and the tests contain attacks on purpose.
 - **Adapters:** Claude Code is verified to start inside the sandbox. The Codex, Gemini and Aider adapters follow their documented CLIs and need real-world reports.

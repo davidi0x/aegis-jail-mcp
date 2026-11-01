@@ -381,6 +381,7 @@ Tak, możesz używać Aegis w pracy za darmo. AGPL wymaga tylko, żebyś, jeśli
 - **Listy hostów działają przez proxy HTTP(S).** Programy ignorujące `HTTPS_PROXY` są blokowane, nie przepuszczane. Zawartość TLS nie jest sprawdzana (wymagałoby to przechwytywania ruchu), więc trzymaj listy krótkie: dozwolony host nadal może odebrać dane.
 - **macOS:** najgroźniejsze usługi Mach są zablokowane, ale nie wszystkie. **Wabiki działają tylko na Linuksie**: macOS i Windows ukrywają prawdziwe pliki zamiast je podmieniać.
 - **Seccomp na Linuksie** to lista blokad znanych groźnych wywołań, a nie ścisła lista dozwolonych.
+- **Windows:** `aegis wrap` i `mcp-jail` odmawiają pracy w projekcie z plikami poświadczeń (`.env`, klucze), chyba że podasz `--expose <nazwa>`, bo AppContainerowi nie da się zabronić jednego pliku w katalogu, który mu udostępniono. `aegis run` tego nie dotyczy: pracuje na kopii bez tych plików.
 - **Hook-strażnik** to dopasowywanie wzorców dla sesji bez piaskownicy. Prawdziwa granica to `aegis run` / `wrap` / `mcp-jail`.
 - **Detektory** (`aegis scan`, filtry wstrzyknięć i zatruwania) to heurystyki: wysoka czułość i potrzeba ludzkiego czytania. Skan tego repozytorium zgłasza znaleziska, bo demo i testy celowo zawierają ataki.
 - **Adaptery:** Claude Code jest sprawdzony. Adaptery Codex, Gemini i Aider wzorują się na dokumentowanych CLI i czekają na zgłoszenia z praktyki.

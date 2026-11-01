@@ -53,6 +53,13 @@ class Session:
         # The command sees the real project, so credential files inside it (.env, keys, files that
         # contain tokens) are masked, exactly as they are left out of an `aegis run` working copy.
         hidden = workspace.find_secret_files(self.project, self.profile.expose_globs())
+        if hidden and self.backend.name.startswith("windows"):
+            # An AppContainer can only be denied a file by carving it out of the directory grant, which
+            # leaves that directory without the right to create new files. Fail closed instead.
+            raise ValueError(
+                "this project contains credential files (" + ", ".join(sorted(hidden)[:5]) + ") and Aegis on "
+                "Windows cannot mask files inside a directory it shares with a command. Use `aegis run` (it works on "
+                "a copy that leaves them out), move them out of the project, or pass --expose <name> to show them.")
         self.hidden_files = sorted(hidden)
         for rel in self.hidden_files:
             spec.fs_rules.append(("deny", self.project / rel))
