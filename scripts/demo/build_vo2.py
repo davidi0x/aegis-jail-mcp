@@ -41,9 +41,19 @@ for txt, font, col, y in [("Aegis Jail MCP", F("Bold", 54), (230, 237, 243), H *
     dr.text(((W - dr.textlength(txt, font=font)) / 2, y), txt, font=font, fill=col)
 card.save(f"{tmp}/card.png")
 card_len = dur[n] + 1.4; vid_len = nframes / 15; total = vid_len + card_len
-subprocess.check_call(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "15", "-i", f"{tmp}/frames/f%05d.png", "-framerate", "15", "-loop", "1", "-t", f"{card_len}", "-i", f"{tmp}/card.png",
-                       "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0,format=yuv420p[v]", "-map", "[v]", "-c:v", "libx264", "-crf", "18", f"{tmp}/video.mp4"])
 starts.append(vid_len + 0.3)
+vf = "[0:v][1:v]concat=n=2:v=1:a=0,format=yuv420p"
+caps = os.environ.get("CAPTIONS")  # optional JSON list of n+1 caption strings, burned into a bar under the terminal
+if caps:
+    import textwrap
+    texts = json.load(open(caps)); ends = [s + dur[i] for i, s in enumerate(starts)]
+    vf += ",pad=iw:ih+170:0:0:color=0x0d1117"
+    for i, (t, st, en) in enumerate(zip(texts, starts, ends)):
+        open(f"{tmp}/cap{i}.txt", "w").write("\n".join(textwrap.wrap(t, 72)))
+        vf += (f",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:textfile={tmp}/cap{i}.txt:fontsize=28:fontcolor=0xe6edf3:"
+               f"x=(w-text_w)/2:y=h-150:line_spacing=8:enable='between(t,{st:.2f},{en + 0.4:.2f})'")
+subprocess.check_call(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "15", "-i", f"{tmp}/frames/f%05d.png", "-framerate", "15", "-loop", "1", "-t", f"{card_len}", "-i", f"{tmp}/card.png",
+                       "-filter_complex", vf + "[v]", "-map", "[v]", "-c:v", "libx264", "-crf", "18", f"{tmp}/video.mp4"])
 inputs, filt = [], []
 for i, st in enumerate(starts):
     inputs += ["-i", f"{adir}/s{i+1}.mp3"]; ms = int(st * 1000)

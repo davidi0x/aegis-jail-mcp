@@ -58,7 +58,7 @@ def main(rec, outdir, fps=15, speed=1.0):
         dr.rectangle([0, 0, W, bar], fill=BAR)
         for j, c in enumerate(((255, 95, 86), (255, 189, 46), (39, 201, 63))):
             dr.ellipse([20 + j * 26, 14, 36 + j * 26, 30], fill=c)
-        title = "~/shop — aegis"
+        title = os.environ.get("TITLE", "~/shop — aegis")
         dr.text((W / 2 - f.getlength(title) / 2, 12), title, font=f, fill=(139, 148, 158))
         for y in range(rows):
             line = scr.buffer[y]
