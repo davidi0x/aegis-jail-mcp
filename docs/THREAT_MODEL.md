@@ -38,7 +38,7 @@ sandbox on Linux, macOS and Windows in CI.
 | Nested user namespaces as a kernel attack surface | `--disable-userns` | |
 | Kernel attack surface via rare syscalls (ptrace, bpf, perf_event_open, keyring, module loading, kexec, mount, raw I/O…) | seccomp blocklist returning EPERM (x86-64 / aarch64; `AEGIS_SECCOMP=0` to disable) | tested |
 | Fill RAM through `/tmp` | `/tmp` tmpfs size-capped (`AEGIS_TMPFS_BYTES`); single-file size capped | |
-| Windows: a credential file inside a directory shared with a command (`wrap`, `mcp-jail`) | The file is detached from its folder's inherited permissions and the container removed from it; its original permissions are saved first and restored exactly afterwards. Two live sessions can't mask the same file | tested on Windows |
+| Windows: a credential file inside a directory shared with a command (`wrap`, `mcp-jail`) | The file is detached from its folder's inherited permissions and the container removed from it; its original permissions are saved first and restored afterwards (same entries; duplicates that Windows adds on restore are cleaned up when that is safe). Two live sessions can't mask the same file | tested on Windows |
 | Windows: Aegis killed mid-run leaves ACLs or masks behind | ACL journal with the owner's process id; the next start removes the container's entries and restores masked files | |
 
 ### Exfiltration

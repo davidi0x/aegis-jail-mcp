@@ -171,12 +171,12 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def _acl(path) -> str:
-    """The file's Windows permissions as text (empty elsewhere)."""
+def _acl(path) -> list:
+    """The file's Windows permission entries, ignoring the inherited marker (empty elsewhere)."""
     if os.name != "nt":
-        return ""
-    r = subprocess.run(["icacls", str(path)], capture_output=True, text=True)
-    return r.stdout.replace(str(path), "").strip()
+        return []
+    from aegis_jail.sandbox.windows import _acl_entries
+    return _acl_entries(Path(path))
 
 
 class SessionTest(unittest.TestCase):
@@ -234,7 +234,10 @@ class SessionTest(unittest.TestCase):
             self.assertIn(".env", sess.hidden_files)
             self.assertEqual((project / "made2.txt").read_text(), "ok", text)
             self.assertEqual(env.read_text(), f"STRIPE={fake_stripe()}\n")  # untouched on the host
-            self.assertEqual(_acl(env), acl_before, "the file's permissions must be restored exactly")
+            acl_after = _acl(env)
+            self.assertEqual(sorted(set(acl_after)), sorted(set(acl_before)),
+                             f"the file's permissions must be restored\nBEFORE: {acl_before}\nAFTER: {acl_after}")
+            self.assertEqual(len(acl_after), len(set(acl_after)), f"duplicate entries left behind: {acl_after}")
         finally:
             shutil.rmtree(project.parent, ignore_errors=True)
 

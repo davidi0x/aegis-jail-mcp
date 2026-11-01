@@ -223,7 +223,7 @@ class AppContainerBackend(Backend):
         for n, m in enumerate(to_mask):
             backup = jfile.with_name(f"{sid}.{n}.acl")
             _icacls(str(m), "/save", str(backup), "/Q")
-            entry = {"path": str(m), "backup": str(backup)}
+            entry = {"path": str(m), "backup": str(backup), "entries": sorted(set(_acl_entries(m)))}
             jdata["masks"].append(entry)
             masks.append(entry)
         jfile.write_text(json.dumps(jdata), encoding="utf-8")
@@ -439,11 +439,49 @@ def _restore_mask(entry: dict) -> bool:
         return False
     if r.returncode != 0 and p.exists():
         return False
+    if p.exists():
+        _tidy(p, backup, entry.get("entries"))
     try:
         backup.unlink()
     except OSError:
         pass
     return True
+
+
+def _parse_icacls(text: str, name: str) -> list[str]:
+    """The permission entries icacls printed for `name`, without the inherited marker, so an entry
+    that is inherited now compares equal to the same entry stored explicitly before."""
+    out = []
+    for i, line in enumerate(text.splitlines()):
+        line = line.strip()
+        if i == 0 and line.startswith(name):
+            line = line[len(name):].strip()
+        if not line or line.startswith(("Successfully processed", "Failed processing")):
+            continue
+        out.append(line.replace("(I)", ""))
+    return out
+
+
+def _acl_entries(p: Path) -> list[str]:
+    try:
+        r = subprocess.run(["icacls", p.name], cwd=str(p.parent), capture_output=True, text=True)
+    except OSError:
+        return []
+    return _parse_icacls(r.stdout or "", p.name)
+
+
+def _tidy(p: Path, backup: Path, wanted: list[str] | None) -> None:
+    """After /restore, Windows adds the parent's inherited entries on top of the saved explicit copies
+    of the same entries, so the same right shows up twice. Remove such duplicates with /reset, but only
+    when that leaves exactly the entries the file had before; otherwise go back to the restored state."""
+    if not wanted:
+        return
+    now = _acl_entries(p)
+    if sorted(set(now)) != wanted or len(now) == len(set(now)):
+        return  # not the duplicate case (or something else differs: leave it alone)
+    subprocess.run(["icacls", str(p), "/reset", "/Q"], capture_output=True)
+    if sorted(set(_acl_entries(p))) != wanted:
+        subprocess.run(["icacls", str(p.parent), "/restore", str(backup), "/Q"], capture_output=True)
 
 
 def _check_mask_conflicts(paths_to_mask: list[Path], sid: str) -> None:
