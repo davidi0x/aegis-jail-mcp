@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Appear, Cursor, Terminal} from '../components/Terminal';
-import {C, SANS} from '../theme';
+import {C, MONO, NOLIG, SANS} from '../theme';
 import {rise, typed} from '../utils';
 
 export const Review: React.FC = () => {
@@ -10,22 +10,22 @@ export const Review: React.FC = () => {
   const diffCmd = typed('aegis diff', f, 14, 0.9);
   const applyCmd = typed('aegis apply', f, 92, 0.9);
   const points: [string, string][] = [
-    ['Risky files (hooks, CI, .mcp.json) need an explicit yes', C.yellow],
-    ['Never writes through symlinks or outside the project', C.blue],
+    ['Risky files (hooks, CI, .mcp.json) need a yes', C.yellow],
+    ['No writes through symlinks or outside the project', C.blue],
     ['A run that tripped a wire is always reviewed', C.red],
   ];
   return (
     <AbsoluteFill style={{padding: '0 110px', fontFamily: SANS, justifyContent: 'center'}}>
       <div style={{display: 'flex', gap: 80, alignItems: 'center'}}>
-        <div style={{width: 700}}>
+        <div style={{width: 780}}>
           <div style={{...rise(f, fps, 4, 40), fontSize: 112, fontWeight: 800, letterSpacing: -3.5, color: '#fff', lineHeight: 1.02}}>You review.</div>
           <div style={{...rise(f, fps, 16, 40), fontSize: 112, fontWeight: 800, letterSpacing: -3.5, color: C.blue, lineHeight: 1.02}}>You decide.</div>
           <div style={{...rise(f, fps, 34, 26), marginTop: 30, fontSize: 36, color: C.dim, lineHeight: 1.45}}>
-            Your real project stays untouched until you run <span style={{color: C.text, fontFamily: 'JetBrains Mono, monospace'}}>aegis apply</span>.
+            Your real project stays untouched until you run <span style={{color: C.text, fontFamily: MONO, ...NOLIG}}>aegis apply</span>.
           </div>
           <div style={{marginTop: 34}}>
             {points.map(([t, color], i) => (
-              <div key={t} style={{...rise(f, fps, 58 + i * 12, 20), display: 'flex', alignItems: 'center', gap: 16, fontSize: 28, color: C.text, margin: '14px 0'}}>
+              <div key={t} style={{...rise(f, fps, 58 + i * 12, 20), display: 'flex', alignItems: 'center', gap: 16, fontSize: 27, color: C.text, margin: '15px 0'}}>
                 <span style={{width: 14, height: 14, borderRadius: 7, background: color, boxShadow: `0 0 14px ${color}`, flexShrink: 0}} />
                 {t}
               </div>
@@ -34,7 +34,7 @@ export const Review: React.FC = () => {
         </div>
 
         <div style={{flex: 1, ...rise(f, fps, 6, 40)}}>
-          <Terminal title="~/shop" style={{height: 640}} fontSize={26}>
+          <Terminal title="~/shop" style={{height: 660}} fontSize={28} lineHeight={48}>
             <div>
               <span style={{color: C.green}}>$ </span>
               {diffCmd}

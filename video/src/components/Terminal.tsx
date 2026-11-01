@@ -1,14 +1,15 @@
 import React from 'react';
 import {interpolate, useCurrentFrame} from 'remotion';
-import {C, MONO, SANS} from '../theme';
+import {C, MONO, NOLIG, SANS} from '../theme';
 import {clamp} from '../utils';
 
-export const Terminal: React.FC<{title: string; style?: React.CSSProperties; fontSize?: number; children: React.ReactNode}> = ({
-  title,
-  style,
-  fontSize = 25,
-  children,
-}) => (
+export const Terminal: React.FC<{
+  title: string;
+  style?: React.CSSProperties;
+  fontSize?: number;
+  lineHeight?: number;
+  children: React.ReactNode;
+}> = ({title, style, fontSize = 25, lineHeight = 44, children}) => (
   <div
     style={{
       background: C.bg,
@@ -37,7 +38,7 @@ export const Terminal: React.FC<{title: string; style?: React.CSSProperties; fon
         {title}
       </div>
     </div>
-    <div style={{padding: '26px 34px', fontFamily: MONO, fontSize, lineHeight: '44px', color: C.text}}>{children}</div>
+    <div style={{padding: '26px 34px', fontFamily: MONO, ...NOLIG, fontSize, lineHeight: `${lineHeight}px`, color: C.text}}>{children}</div>
   </div>
 );
 

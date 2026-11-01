@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Appear, Badge, Cursor, Terminal} from '../components/Terminal';
-import {C, MONO, SANS} from '../theme';
+import {C, MONO, NOLIG, SANS} from '../theme';
 import {clamp, fade, pop, rise, typed} from '../utils';
 
 const CMD = 'aegis run --agent claude-code --prompt "Fix the failing test"';
@@ -47,8 +47,8 @@ export const Demo: React.FC = () => {
       <AbsoluteFill style={{background: `rgba(248,81,73,${flash})`}} />
 
       {/* terminal */}
-      <div style={{position: 'absolute', left: 64, top: 100, width: 1200, ...rise(f, fps, 0, 40)}}>
-        <Terminal title="agent run · ~/shop" style={{height: 760}} fontSize={25}>
+      <div style={{position: 'absolute', left: 64, top: 84, width: 1200, ...rise(f, fps, 0, 40)}}>
+        <Terminal title="agent run · ~/shop" style={{height: 800}} fontSize={28} lineHeight={48}>
           <div>
             <span style={{color: C.green}}>$ </span>
             {cmd}
@@ -115,7 +115,7 @@ export const Demo: React.FC = () => {
       </div>
 
       {/* right column */}
-      <div style={{position: 'absolute', left: 1306, top: 100, width: 554}}>
+      <div style={{position: 'absolute', left: 1306, top: 84, width: 554}}>
         <div
           style={{
             ...rise(f, fps, 118, 30),
@@ -124,8 +124,9 @@ export const Demo: React.FC = () => {
             borderRadius: 16,
             padding: '20px 26px 24px',
             fontFamily: MONO,
-            fontSize: 22,
-            lineHeight: '34px',
+            ...NOLIG,
+            fontSize: 23,
+            lineHeight: '35px',
             color: C.dim,
           }}
         >

@@ -19,5 +19,8 @@ export const C = {
   navy: '#10213f',
 };
 
+// JetBrains Mono turns `-->`, `<!--` and `--` into arrows and dashes; a terminal must show them as typed.
+export const NOLIG = {fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0'} as const;
+
 export const SANS = "Inter, 'SF Pro Display', -apple-system, 'Segoe UI', system-ui, sans-serif";
 export const MONO = "'JetBrains Mono', 'DejaVu Sans Mono', Menlo, Consolas, monospace";

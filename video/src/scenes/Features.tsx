@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
-import {C, MONO, SANS} from '../theme';
+import {C, MONO, NOLIG, SANS} from '../theme';
 import {calm, rise} from '../utils';
 
 const CARDS = [
@@ -39,7 +39,7 @@ export const Features: React.FC = () => {
                 boxShadow: `0 24px 70px rgba(0,0,0,.45), 0 0 0 1px ${c.color}22, 0 0 50px ${c.color}14`,
               }}
             >
-              <div style={{fontFamily: MONO, fontSize: 25, color: c.color, marginBottom: 14}}>$ {c.cmd}</div>
+              <div style={{fontFamily: MONO, ...NOLIG, fontSize: 26, color: c.color, marginBottom: 14}}>$ {c.cmd}</div>
               <div style={{fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: -1}}>{c.title}</div>
               <div style={{fontSize: 28, color: C.dim, marginTop: 10}}>
                 <span style={{color: c.color, fontWeight: 700}}>→ </span>
