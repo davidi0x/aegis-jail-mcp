@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/IwanskyDD/aegis-mcp-jail/actions/workflows/ci.yml"><img src="https://github.com/IwanskyDD/aegis-mcp-jail/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/IwanskyDD/aegis-jail-mcp/actions/workflows/ci.yml"><img src="https://github.com/IwanskyDD/aegis-jail-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Linux, macOS, Windows">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero dependencies">
@@ -100,10 +100,10 @@ What happened: the agent "found" keys, but they were **decoys** planted by Aegis
 ## Install
 
 ```sh
-pip install git+https://github.com/IwanskyDD/aegis-mcp-jail
+pip install git+https://github.com/IwanskyDD/aegis-jail-mcp
 ```
 
-or in an isolated environment: `pipx install git+https://github.com/IwanskyDD/aegis-mcp-jail`
+or in an isolated environment: `pipx install git+https://github.com/IwanskyDD/aegis-jail-mcp`
 
 | OS | One extra step |
 |---|---|
@@ -250,7 +250,7 @@ Drop it into any MCP client config (Claude Desktop, Cursor, VS Code, Claude Code
 ### Claude Code plugin & MCP server
 
 ```
-/plugin marketplace add IwanskyDD/aegis-mcp-jail
+/plugin marketplace add IwanskyDD/aegis-jail-mcp
 /plugin install aegis@aegis
 ```
 
@@ -285,7 +285,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install git+https://github.com/IwanskyDD/aegis-mcp-jail
+      - run: pip install git+https://github.com/IwanskyDD/aegis-jail-mcp
       - run: aegis scan .
 ```
 
@@ -433,7 +433,7 @@ Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it a
 Bug reports, escape attempts and agent adapters are very welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Found a sandbox escape? Please report it privately, see [SECURITY.md](SECURITY.md).
 
 ```sh
-git clone https://github.com/IwanskyDD/aegis-mcp-jail && cd aegis-mcp-jail
+git clone https://github.com/IwanskyDD/aegis-jail-mcp && cd aegis-jail-mcp
 AEGIS_REQUIRE_SANDBOX=1 python3 -m unittest discover -s tests -t . -v
 python3 scripts/aegis.py demo       # run from the checkout, no install
 python3 scripts/make_images.py      # regenerate the pictures in docs/images

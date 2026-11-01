@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/IwanskyDD/aegis-mcp-jail/actions/workflows/ci.yml"><img src="https://github.com/IwanskyDD/aegis-mcp-jail/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/IwanskyDD/aegis-jail-mcp/actions/workflows/ci.yml"><img src="https://github.com/IwanskyDD/aegis-jail-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/platformy-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Linux, macOS, Windows">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/zale%C5%BCno%C5%9Bci-0-brightgreen" alt="zero zależności">
@@ -100,10 +100,10 @@ Co się stało: agent „znalazł" klucze, ale to były **wabiki** podłożone p
 ## Instalacja
 
 ```sh
-pip install git+https://github.com/IwanskyDD/aegis-mcp-jail
+pip install git+https://github.com/IwanskyDD/aegis-jail-mcp
 ```
 
-lub w izolowanym środowisku: `pipx install git+https://github.com/IwanskyDD/aegis-mcp-jail`
+lub w izolowanym środowisku: `pipx install git+https://github.com/IwanskyDD/aegis-jail-mcp`
 
 | System | Jeden dodatkowy krok |
 |---|---|
@@ -250,7 +250,7 @@ Wklej to do konfiguracji dowolnego klienta MCP (Claude Desktop, Cursor, VS Code,
 ### Wtyczka Claude Code i serwer MCP
 
 ```
-/plugin marketplace add IwanskyDD/aegis-mcp-jail
+/plugin marketplace add IwanskyDD/aegis-jail-mcp
 /plugin install aegis@aegis
 ```
 
@@ -285,7 +285,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install git+https://github.com/IwanskyDD/aegis-mcp-jail
+      - run: pip install git+https://github.com/IwanskyDD/aegis-jail-mcp
       - run: aegis scan .
 ```
 
@@ -398,7 +398,7 @@ Tak, możesz używać Aegis w pracy za darmo. AGPL wymaga tylko, żebyś, jeśli
 Zgłoszenia błędów, próby ucieczki z piaskownicy i adaptery agentów są mile widziane. Zacznij od [CONTRIBUTING.md](CONTRIBUTING.md). Znalazłeś ucieczkę z piaskownicy? Zgłoś ją prywatnie, zobacz [SECURITY.md](SECURITY.md).
 
 ```sh
-git clone https://github.com/IwanskyDD/aegis-mcp-jail && cd aegis-mcp-jail
+git clone https://github.com/IwanskyDD/aegis-jail-mcp && cd aegis-jail-mcp
 AEGIS_REQUIRE_SANDBOX=1 python3 -m unittest discover -s tests -t . -v
 python3 scripts/aegis.py demo       # uruchom z repozytorium, bez instalacji
 ```

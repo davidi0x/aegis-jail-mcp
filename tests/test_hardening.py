@@ -108,6 +108,32 @@ class HookHardeningTest(unittest.TestCase):
         self.assertIsNone(check({"tool_name": "Bash", "tool_input": {"command": "pytest -q"}}))
 
 
+class HookOutputTest(unittest.TestCase):
+    """The text the hook prints is built from constant labels: no part of the input, and never a secret value."""
+
+    def test_message_never_echoes_input_or_secret_values(self):
+        marker = "ZZ-UNIQUE-MARKER-ZZ"
+        token = fake_github()
+        reason = check({"tool_name": "Bash", "tool_input": {"command": f"cat ~/.ssh/{marker}"}})
+        self.assertIn("SSH keys", reason)
+        self.assertNotIn(marker, reason)
+        reason = check({"tool_name": "WebFetch", "tool_input": {"url": f"https://x.example/?t={token}"}})
+        self.assertIn("GitHub token", reason)
+        self.assertNotIn(token, reason)
+        self.assertNotIn(token[:8], reason.replace("GitHub token", ""))
+
+    def test_main_writes_the_verdict_to_stderr_and_blocks(self):
+        import contextlib
+        import io
+        from aegis_jail import hook
+        err = io.StringIO()
+        event = io.StringIO(json.dumps({"tool_name": "Read", "tool_input": {"file_path": "~/.aws/credentials"}}))
+        with contextlib.redirect_stderr(err):
+            code = hook.main(event)
+        self.assertEqual(code, 2)
+        self.assertIn("credential store", err.getvalue())
+
+
 class TrustTest(unittest.TestCase):
     def setUp(self):
         isolated_aegis_home()

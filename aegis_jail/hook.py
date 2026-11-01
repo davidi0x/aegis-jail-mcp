@@ -21,13 +21,25 @@ from pathlib import Path
 from aegis_jail import paths, secretscan
 
 FILE_TOOLS = {"Read", "Edit", "Write", "MultiEdit", "NotebookEdit", "NotebookRead", "Grep", "Glob", "LS"}
-SECRET_WORDS = [
-    r"\.ssh/", r"\.ssh\b", r"id_rsa", r"id_ed25519", r"id_ecdsa", r"\.aws/credentials", r"\.aws\b",
-    r"\.gnupg", r"\.kube/config", r"\.docker/config\.json", r"\.netrc", r"\.npmrc", r"\.pypirc",
-    r"\.git-credentials", r"\.password-store", r"Library/Keychains", r"\.config/gcloud", r"\.config/gh\b",
-    r"\.azure\b", r"\.aegis/canary", r"/proc/[^/\s]+/environ", r"security\s+find-(generic|internet)-password",
-    r"\bkeyctl\s+(print|read|pipe)", r"secret-tool\s+lookup", r"gh\s+auth\s+token",
+# (label, pattern). Only the label is ever shown to the user: a message is built from these constants,
+# never from the text that matched, so no part of a command or file ends up in the output.
+BLOCKED_LOCATIONS = [
+    ("SSH keys", r"\.ssh/"), ("SSH keys", r"\.ssh\b"), ("SSH keys", r"id_rsa"), ("SSH keys", r"id_ed25519"),
+    ("SSH keys", r"id_ecdsa"), ("AWS credentials", r"\.aws/credentials"), ("AWS credentials", r"\.aws\b"),
+    ("GnuPG keys", r"\.gnupg"), ("Kubernetes config", r"\.kube/config"),
+    ("Docker credentials", r"\.docker/config\.json"), ("netrc login file", r"\.netrc"),
+    ("npm login file", r"\.npmrc"), ("PyPI login file", r"\.pypirc"), ("git credentials", r"\.git-credentials"),
+    ("password store", r"\.password-store"), ("macOS keychain", r"Library/Keychains"),
+    ("Google Cloud config", r"\.config/gcloud"), ("GitHub CLI config", r"\.config/gh\b"),
+    ("Azure config", r"\.azure\b"), ("Aegis canary", r"\.aegis/canary"),
+    ("process environment", r"/proc/[^/\s]+/environ"),
+    ("keychain command", r"security\s+find-(generic|internet)-password"),
+    ("kernel keyring", r"\bkeyctl\s+(print|read|pipe)"), ("desktop keyring", r"secret-tool\s+lookup"),
+    ("GitHub CLI login", r"gh\s+auth\s+token"),
 ]
+_LOCATION_RES = [(label, re.compile(rx, re.I)) for label, rx in BLOCKED_LOCATIONS]
+# The kinds of credential `secretscan` can find, as constants we are allowed to print.
+_KIND_LABEL = {name: name for name, _ in secretscan.PATTERNS}
 
 
 def normalize_command(cmd: str) -> str:
@@ -39,21 +51,26 @@ def normalize_command(cmd: str) -> str:
     return s
 
 
-_SECRET_RE = re.compile("|".join(SECRET_WORDS), re.I)
+def _blocked_label(text: str) -> str | None:
+    """The label of the first protected location mentioned in `text`, or None."""
+    for label, rx in _LOCATION_RES:
+        if rx.search(text):
+            return label
+    return None
 
 
-def _secret_paths() -> list[Path]:
+def _protected_paths() -> list[Path]:
     return [paths.expand(s) for s in paths.SECRET_PATHS] + [paths.aegis_home() / "canary"]
 
 
-def _is_secret_path(value: str, cwd: Path) -> bool:
+def _is_protected_path(value: str, cwd: Path) -> bool:
     try:
         p = Path(os.path.expanduser(value))
         p = (p if p.is_absolute() else cwd / p).resolve()
     except (OSError, RuntimeError, ValueError):
         return False
     s = str(p).lower()
-    return any(s == str(sp).lower() or s.startswith(str(sp).lower() + os.sep) for sp in _secret_paths())
+    return any(s == str(sp).lower() or s.startswith(str(sp).lower() + os.sep) for sp in _protected_paths())
 
 
 def check(event: dict) -> str | None:
@@ -64,20 +81,26 @@ def check(event: dict) -> str | None:
     if tool in FILE_TOOLS:
         for key in ("file_path", "path", "notebook_path", "pattern"):
             v = args.get(key)
-            if isinstance(v, str) and v and (_is_secret_path(v, cwd) or (key == "pattern" and _SECRET_RE.search(v))):
+            if not (isinstance(v, str) and v):
+                continue
+            if _is_protected_path(v, cwd):
                 return f"Aegis: {tool} on '{v}' touches a credential store; access is blocked."
+            label = _blocked_label(v) if key == "pattern" else None
+            if label:
+                return f"Aegis: {tool} on '{v}' searches for a credential location ({label}); access is blocked."
     if tool == "Bash":
         cmd = str(args.get("command", ""))
-        m = _SECRET_RE.search(cmd) or _SECRET_RE.search(normalize_command(cmd))
-        if m:
-            return (f"Aegis: this command references a credential location ('{m.group(0)}'), which is blocked. "
+        label = _blocked_label(cmd) or _blocked_label(normalize_command(cmd))
+        if label:
+            return (f"Aegis: this command references a credential location ({label}), which is blocked. "
                     "If the task really needs it, ask the user to allow it explicitly.")
     # Data-loss prevention: nothing that leaves the machine may carry a credential.
     outbound = tool == "Bash" or tool.startswith("mcp__") or tool in ("WebFetch", "WebSearch", "Task")
     if outbound:
-        found = secretscan.find_secrets(json.dumps(args, ensure_ascii=False))
-        if found:
-            return (f"Aegis: this {tool} call contains a credential ({', '.join(found)}); sending secrets to "
+        kinds = secretscan.find_secrets(json.dumps(args, ensure_ascii=False))
+        if kinds:
+            shown = ", ".join(sorted({_KIND_LABEL.get(k, "credential") for k in kinds}))
+            return (f"Aegis: this {tool} call contains a credential ({shown}); sending it to "
                     "tools, commands or websites is blocked. Use an environment variable or ask the user.")
     return None
 
@@ -89,8 +112,8 @@ def main(stdin=None) -> int:
         event = json.load(stdin or sys.stdin)
     except ValueError:
         return 0
-    reason = check(event if isinstance(event, dict) else {})
-    if reason:
-        print(reason, file=sys.stderr)
+    verdict = check(event if isinstance(event, dict) else {})
+    if verdict:
+        sys.stderr.write(verdict + "\n")  # shown to the model; built only from constant labels (see above)
         return 2
     return 0
