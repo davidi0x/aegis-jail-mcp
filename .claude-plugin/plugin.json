@@ -2,9 +2,9 @@
   "name": "aegis",
   "version": "0.4.0",
   "description": "Aegis Jail MCP is a least-privilege sandbox for AI agents. Run commands and MCP servers without access to your home directory, credentials or the network, review diffs before applying, and block credential reads in Claude Code.",
-  "author": { "name": "IwanskyDD" },
-  "homepage": "https://github.com/IwanskyDD/aegis-jail-mcp",
-  "repository": "https://github.com/IwanskyDD/aegis-jail-mcp",
+  "author": { "name": "davidi0x" },
+  "homepage": "https://github.com/davidi0x/aegis-jail-mcp",
+  "repository": "https://github.com/davidi0x/aegis-jail-mcp",
   "license": "AGPL-3.0-or-later",
   "keywords": ["security", "sandbox", "mcp", "least-privilege", "prompt-injection", "secrets"]
 }

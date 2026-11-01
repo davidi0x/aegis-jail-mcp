@@ -1,6 +1,6 @@
 # Install Aegis (Windows). Usage: irm <raw-url>/scripts/install.ps1 | iex
 $ErrorActionPreference = "Stop"
-$repo = if ($env:AEGIS_REPO) { $env:AEGIS_REPO } else { "https://github.com/IwanskyDD/aegis-jail-mcp" }
+$repo = if ($env:AEGIS_REPO) { $env:AEGIS_REPO } else { "https://github.com/davidi0x/aegis-jail-mcp" }
 $ref = if ($env:AEGIS_REF) { $env:AEGIS_REF } else { "main" }
 $py = Get-Command py -ErrorAction SilentlyContinue
 if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }

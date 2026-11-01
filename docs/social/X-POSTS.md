@@ -1,7 +1,7 @@
 # Aegis Jail MCP — X (Twitter) posts pack
 
 Link goes in the **first reply**, not in the post (X reduces reach of posts with links).
-Repo: https://github.com/IwanskyDD/aegis-jail-mcp · Images: `docs/social/out/`
+Repo: https://github.com/davidi0x/aegis-jail-mcp · Images: `docs/social/out/`
 Honesty rules: verified end-to-end with Claude Code; Codex/Gemini/Aider adapters are untested; decoys are Linux-only; early version (v0.4).
 
 ---------------------------------------------------------------------
@@ -49,8 +49,8 @@ Zero dependencies (Python stdlib). Linux, macOS, Windows, tested in CI. AGPL-3.0
 Try it on a throwaway repo and tell me what breaks. 👇
 
 **8/**
-pip install git+https://github.com/IwanskyDD/aegis-jail-mcp
-Repo + docs: https://github.com/IwanskyDD/aegis-jail-mcp
+pip install git+https://github.com/davidi0x/aegis-jail-mcp
+Repo + docs: https://github.com/davidi0x/aegis-jail-mcp
 Stars and brutal issues both welcome.
 
 ---------------------------------------------------------------------

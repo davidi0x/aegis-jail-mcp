@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install Aegis (macOS / Linux). Usage: curl -fsSL <raw-url>/scripts/install.sh | sh
 set -e
-REPO="${AEGIS_REPO:-https://github.com/IwanskyDD/aegis-jail-mcp}"
+REPO="${AEGIS_REPO:-https://github.com/davidi0x/aegis-jail-mcp}"
 REF="${AEGIS_REF:-main}"
 PY="$(command -v python3 || true)"
 [ -n "$PY" ] || { echo "Aegis needs Python 3.10+ (python3 not found)"; exit 1; }

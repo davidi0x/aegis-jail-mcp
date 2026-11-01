@@ -5,7 +5,7 @@ import {Shield} from '../components/Shield';
 import {C, MONO, NOLIG, SANS} from '../theme';
 import {fade, pop, rise, typed} from '../utils';
 
-const INSTALL = 'pip install git+https://github.com/IwanskyDD/aegis-jail-mcp';
+const INSTALL = 'pip install git+https://github.com/davidi0x/aegis-jail-mcp';
 
 export const Cta: React.FC = () => {
   const f = useCurrentFrame();
@@ -51,7 +51,7 @@ export const Cta: React.FC = () => {
         </div>
       </div>
       <div style={{display: 'flex', alignItems: 'center', gap: 26, marginTop: 40, ...rise(f, fps, 110, 20)}}>
-        <span style={{fontSize: 34, color: C.text, fontWeight: 600}}>github.com/IwanskyDD/aegis-jail-mcp</span>
+        <span style={{fontSize: 34, color: C.text, fontWeight: 600}}>github.com/davidi0x/aegis-jail-mcp</span>
         <span style={{width: 6, height: 6, borderRadius: 3, background: C.dim}} />
         <span style={{fontSize: 28, color: C.dim}}>Linux · macOS · Windows · AGPL-3.0</span>
       </div>
