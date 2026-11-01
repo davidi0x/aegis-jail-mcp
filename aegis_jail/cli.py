@@ -100,7 +100,7 @@ def cmd_init(args) -> int:
 
 def cmd_doctor(args) -> int:
     from aegis_jail.sandbox import SandboxUnavailable, get_backend
-    print(f"Aegis {__version__} on {sys.platform}, Python {sys.version.split()[0]}")
+    print(f"Aegis Jail MCP {__version__} on {sys.platform}, Python {sys.version.split()[0]}")
     try:
         b = get_backend()
         from aegis_jail import seccomp
@@ -497,7 +497,7 @@ def cmd_demo(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="aegis", description="Give an AI agent a task. Keep control of what it can access.")
-    ap.add_argument("--version", action="version", version=f"aegis {__version__}")
+    ap.add_argument("--version", action="version", version=f"Aegis Jail MCP {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def common(p):

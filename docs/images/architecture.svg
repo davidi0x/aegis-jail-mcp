@@ -14,7 +14,7 @@
 <text x="155" y="388" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">can be steered by a README,</text>
 <text x="155" y="406" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">an issue or a web page</text>
 <rect x="330" y="70" width="440" height="370" rx="16" fill="#0e2147" stroke="#58a6ff" stroke-width="1.5"/>
-<text x="550" y="104" fill="#58a6ff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="middle">AEGIS</text>
+<text x="550" y="104" fill="#58a6ff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="middle">AEGIS JAIL MCP</text>
 <rect x="354" y="126" width="392" height="46" rx="8" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5"/>
 <rect x="354" y="126" width="6" height="46" rx="3" fill="#58a6ff"/>
 <text x="374" y="146" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">OS sandbox</text>

@@ -325,7 +325,7 @@ def handle(msg: dict) -> dict | None:
             result: dict = {
                 "protocolVersion": asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0],
                 "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "aegis", "title": "Aegis sandbox", "version": __version__},
+                "serverInfo": {"name": "aegis", "title": "Aegis Jail MCP", "version": __version__},
                 "instructions": ("Use aegis_run to execute shell commands (tests, builds, untrusted scripts) in a "
                                  "sandbox that hides the user's home directory and credentials and blocks network "
                                  "access unless allowed. Changes land in a working copy; show aegis_diff to the "

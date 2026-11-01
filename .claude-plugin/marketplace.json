@@ -1,7 +1,7 @@
 {
   "name": "aegis",
   "owner": { "name": "IwanskyDD" },
-  "metadata": { "description": "Aegis - least-privilege sandbox for AI agents" },
+  "metadata": { "description": "Aegis Jail MCP - least-privilege sandbox for AI agents" },
   "plugins": [
     {
       "name": "aegis",

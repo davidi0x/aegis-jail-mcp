@@ -1,4 +1,4 @@
-# Aegis
+# Aegis Jail MCP
 
 > Daj AI zadanie. Zachowaj kontrolę nad tym, do czego ma dostęp.
 

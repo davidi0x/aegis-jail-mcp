@@ -1,4 +1,4 @@
-# Contributing to Aegis
+# Contributing to Aegis Jail MCP
 
 Thanks for helping make AI agents safer to use!
 

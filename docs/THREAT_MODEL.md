@@ -1,4 +1,4 @@
-# Aegis threat model
+# Aegis Jail MCP threat model
 
 Who we defend against, what they try, and what stops them. Every row marked
 **tested** has a regression test in `tests/` that runs against the real OS

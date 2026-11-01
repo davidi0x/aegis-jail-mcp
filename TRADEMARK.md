@@ -1,6 +1,6 @@
-# Aegis trademark policy
+# Aegis Jail MCP trademark policy
 
-The **Aegis** name and the shield logo (`.claude-plugin/icon.png`) are trademarks
+The **Aegis Jail MCP** name (and its short form, **Aegis**) and the shield logo (`.claude-plugin/icon.png`) are trademarks
 of the project owner (IwanskyDD). The AGPL-3.0 license covers the *code*; it does
 not license the *name* or the *logo*. This is normal for open-source projects
 (Python, Firefox, Rust and many others do the same) and it is what lets us keep

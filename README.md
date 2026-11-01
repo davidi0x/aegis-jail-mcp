@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="Aegis: give AI agents a task, not your whole computer" width="100%">
+  <img src="docs/images/banner.svg" alt="Aegis Jail MCP: give AI agents a task, not your whole computer" width="100%">
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="#what-is-aegis">What it is</a> ·
+  <a href="#what-is-aegis-jail-mcp">What it is</a> ·
   <a href="#see-it-in-action">Demo</a> ·
   <a href="#where-can-you-use-it">Where to use it</a> ·
   <a href="#install">Install</a> ·
@@ -27,9 +27,9 @@
 
 ---
 
-## What is Aegis?
+## What is Aegis Jail MCP?
 
-**Aegis is a sandbox for AI agents.** It runs coding agents (Claude Code, Codex, Gemini CLI, Aider), MCP servers and untrusted scripts inside an operating-system sandbox, so that the agent gets **a copy of your project and nothing else**:
+**Aegis Jail MCP is a sandbox for AI agents.** (Short name: *Aegis*. The command is `aegis`.) It runs coding agents (Claude Code, Codex, Gemini CLI, Aider), MCP servers and untrusted scripts inside an operating-system sandbox, so that the agent gets **a copy of your project and nothing else**:
 
 - no home directory, no `~/.ssh`, no `~/.aws`, no keys in your project's `.env`;
 - no tokens from your environment variables;
@@ -407,7 +407,7 @@ No sandbox is, and Aegis says so. It reduces what a hijacked agent can reach and
 <details>
 <summary><b>Why AGPL, and can I use it at work?</b></summary>
 
-Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it and offer it to others (including as a hosted service), you share your changes under the same license. The "Aegis" name and logo are trademarks: fork freely, but rename your distribution. See [TRADEMARK.md](TRADEMARK.md) and [docs/PROTECTING-THE-WORK.md](docs/PROTECTING-THE-WORK.md).
+Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it and offer it to others (including as a hosted service), you share your changes under the same license. The "Aegis Jail MCP" and "Aegis" names and the logo are trademarks: fork freely, but rename your distribution. See [TRADEMARK.md](TRADEMARK.md) and [docs/PROTECTING-THE-WORK.md](docs/PROTECTING-THE-WORK.md).
 </details>
 
 ## Honest limits
@@ -443,4 +443,4 @@ If Aegis saved you from an "allow all", a star helps other people find it.
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE). "Aegis" and the shield logo are trademarks, see [TRADEMARK.md](TRADEMARK.md). Product concept (Polish): [docs/KONCEPCJA.md](docs/KONCEPCJA.md).
+[AGPL-3.0-or-later](LICENSE). "Aegis Jail MCP", "Aegis" and the shield logo are trademarks, see [TRADEMARK.md](TRADEMARK.md). Product concept (Polish): [docs/KONCEPCJA.md](docs/KONCEPCJA.md).

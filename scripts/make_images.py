@@ -129,11 +129,11 @@ def banner(width: int = 1280, height: int = 400, social: bool = False) -> str:
     chip_svg, x = [], cx - 400
     for label, col in chips:
         wlab = len(label) * 8.6 + 34
-        chip_svg.append(f'<rect x="{x:.0f}" y="{height // 2 + 110}" width="{wlab:.0f}" height="34" rx="17" fill="none" '
-                        f'stroke="{col}" stroke-opacity=".7"/><text x="{x + wlab / 2:.0f}" y="{height // 2 + 132}" fill="{col}" '
+        chip_svg.append(f'<rect x="{x:.0f}" y="{height // 2 + 122}" width="{wlab:.0f}" height="34" rx="17" fill="none" '
+                        f'stroke="{col}" stroke-opacity=".7"/><text x="{x + wlab / 2:.0f}" y="{height // 2 + 144}" fill="{col}" '
                         f'font-family="{SANS}" font-size="15" text-anchor="middle">{esc(label)}</text>')
         x += wlab + 14
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="Aegis - give AI agents a task, not your whole computer">
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="Aegis Jail MCP - give AI agents a task, not your whole computer">
 <defs>
 <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d1117"/><stop offset="1" stop-color="#10213f"/></linearGradient>
 <radialGradient id="glow" cx=".5" cy=".38" r=".5"><stop offset="0" stop-color="#1f6feb" stop-opacity=".35"/><stop offset="1" stop-color="#1f6feb" stop-opacity="0"/></radialGradient>
@@ -141,9 +141,9 @@ def banner(width: int = 1280, height: int = 400, social: bool = False) -> str:
 <rect width="{width}" height="{height}" fill="url(#bg)"/><rect width="{width}" height="{height}" fill="url(#glow)"/>
 <g stroke="#58a6ff" stroke-opacity=".07">{"".join(f'<line x1="{i}" y1="0" x2="{i}" y2="{height}"/>' for i in range(0, width, 64))}{"".join(f'<line x1="0" y1="{j}" x2="{width}" y2="{j}"/>' for j in range(0, height, 64))}</g>
 <g transform="translate({cx - 360},{height // 2 - 34}) scale(1.35)">{SHIELD}</g>
-<text x="{cx - 270}" y="{height // 2 - 8}" fill="#ffffff" font-family="{SANS}" font-size="84" font-weight="800" letter-spacing="-2">Aegis</text>
-<text x="{cx - 268}" y="{height // 2 + 36}" fill="#c9d1d9" font-family="{SANS}" font-size="28">Give AI agents a task, not your whole computer.</text>
-<text x="{cx - 268}" y="{height // 2 + 72}" fill="{DIM}" font-family="{SANS}" font-size="19">A least-privilege sandbox for coding agents and MCP servers.</text>
+<text x="{cx - 270}" y="{height // 2 - 8}" fill="#ffffff" font-family="{SANS}" font-size="80" font-weight="800" letter-spacing="-2">Aegis <tspan fill="#58a6ff">Jail MCP</tspan></text>
+<text x="{cx - 268}" y="{height // 2 + 44}" fill="#c9d1d9" font-family="{SANS}" font-size="28">Give AI agents a task, not your whole computer.</text>
+<text x="{cx - 268}" y="{height // 2 + 82}" fill="{DIM}" font-family="{SANS}" font-size="19">A least-privilege sandbox for coding agents and MCP servers.</text>
 {"".join(chip_svg)}
 </svg>'''
 
@@ -184,7 +184,7 @@ def architecture() -> str:
           txt(155, 340, "npm install · pytest", 14, DIM, "middle"),
           txt(155, 388, "can be steered by a README,", 13, RED, "middle"), txt(155, 406, "an issue or a web page", 13, RED, "middle")]
     # middle: aegis
-    s += [box(330, 70, 440, 370, "#0e2147", BLUE, 16), txt(550, 104, "AEGIS", 16, BLUE, "middle", "800")]
+    s += [box(330, 70, 440, 370, "#0e2147", BLUE, 16), txt(550, 104, "AEGIS JAIL MCP", 16, BLUE, "middle", "800")]
     layers = [("OS sandbox", "bubblewrap · Seatbelt · AppContainer", BLUE),
               ("Syscall filter", "seccomp blocklist (Linux)", BLUE),
               ("Working copy", "agent edits a copy, you review the diff", GREEN),
@@ -249,7 +249,7 @@ def mcp_jail() -> str:
           txt(125, 180, "Claude Code", 14, DIM, "middle"), txt(125, 202, "Claude Desktop", 14, DIM, "middle"),
           txt(125, 224, "Cursor · VS Code", 14, DIM, "middle"), txt(125, 262, "your model sees only", 13, TEXT, "middle"),
           txt(125, 282, "filtered, clean tools", 13, TEXT, "middle")]
-    s += [box(300, 80, 500, 290, "#1d1535", PURPLE, 16), txt(550, 110, "AEGIS MCP JAIL", 15, PURPLE, "middle", "800")]
+    s += [box(300, 80, 500, 290, "#1d1535", PURPLE, 16), txt(550, 110, "AEGIS JAIL MCP", 15, PURPLE, "middle", "800")]
     rules = [("Tool firewall", "--allow-tools / --deny-tools globs"),
              ("Rug-pull protection", "definitions pinned; a change hides it"),
              ("Poisoning filter", "hidden instructions & invisible Unicode"),

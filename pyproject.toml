@@ -3,9 +3,9 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aegis-mcp-jail"
+name = "aegis-jail-mcp"
 dynamic = ["version"]
-description = "Least-privilege sandbox for AI agents and MCP servers: no home dir, no credentials, no network unless verified as needed."
+description = "Aegis Jail MCP: a least-privilege sandbox for AI agents and MCP servers (no home dir, no credentials, no network unless verified as needed)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
@@ -20,7 +20,7 @@ classifiers = [
 
 [project.scripts]
 aegis = "aegis_jail.cli:main"
-aegis-mcp-jail = "aegis_jail.cli:main"
+aegis-jail-mcp = "aegis_jail.cli:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "aegis_jail.__version__"}
