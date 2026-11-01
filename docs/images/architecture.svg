@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" role="img" aria-label="Aegis architecture: an untrusted agent runs inside an OS sandbox between it and your machine">
+<defs><marker id="a58a6ff" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker><marker id="af85149" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f85149"/></marker><marker id="a3fb950" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/></marker></defs>
+<rect width="1100" height="520" rx="14" fill="#0d1117" stroke="#30363d"/>
+<text x="550" y="44" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle">What sits between an AI agent and your machine</text>
+<rect x="40" y="90" width="230" height="330" rx="12" fill="#2d1417" stroke="#f85149" stroke-width="1.5"/>
+<text x="155" y="126" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="middle">UNTRUSTED</text>
+<text x="155" y="156" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" text-anchor="middle">AI coding agent</text>
+<text x="155" y="184" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="middle">Claude Code · Codex</text>
+<text x="155" y="204" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="middle">Gemini · Aider</text>
+<text x="155" y="246" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" text-anchor="middle">MCP server</text>
+<text x="155" y="272" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="middle">npx / uvx / any binary</text>
+<text x="155" y="314" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" text-anchor="middle">Scripts &amp; dependencies</text>
+<text x="155" y="340" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="middle">npm install · pytest</text>
+<text x="155" y="388" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">can be steered by a README,</text>
+<text x="155" y="406" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">an issue or a web page</text>
+<rect x="330" y="70" width="440" height="370" rx="16" fill="#0e2147" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="550" y="104" fill="#58a6ff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="middle">AEGIS</text>
+<rect x="354" y="126" width="392" height="46" rx="8" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5"/>
+<rect x="354" y="126" width="6" height="46" rx="3" fill="#58a6ff"/>
+<text x="374" y="146" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">OS sandbox</text>
+<text x="374" y="164" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start">bubblewrap · Seatbelt · AppContainer</text>
+<rect x="354" y="178" width="392" height="46" rx="8" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5"/>
+<rect x="354" y="178" width="6" height="46" rx="3" fill="#58a6ff"/>
+<text x="374" y="198" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">Syscall filter</text>
+<text x="374" y="216" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start">seccomp blocklist (Linux)</text>
+<rect x="354" y="230" width="392" height="46" rx="8" fill="#0d1117" stroke="#3fb950" stroke-width="1.5"/>
+<rect x="354" y="230" width="6" height="46" rx="3" fill="#3fb950"/>
+<text x="374" y="250" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">Working copy</text>
+<text x="374" y="268" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start">agent edits a copy, you review the diff</text>
+<rect x="354" y="282" width="392" height="46" rx="8" fill="#0d1117" stroke="#3fb950" stroke-width="1.5"/>
+<rect x="354" y="282" width="6" height="46" rx="3" fill="#3fb950"/>
+<text x="374" y="302" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">Filtering proxy</text>
+<text x="374" y="320" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start">allowed hosts only · ports · TLS SNI · DLP</text>
+<rect x="354" y="334" width="392" height="46" rx="8" fill="#0d1117" stroke="#d29922" stroke-width="1.5"/>
+<rect x="354" y="334" width="6" height="46" rx="3" fill="#d29922"/>
+<text x="374" y="354" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">Decoys &amp; tripwires</text>
+<text x="374" y="372" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start">fake keys expose a hijacked agent</text>
+<rect x="354" y="386" width="392" height="46" rx="8" fill="#0d1117" stroke="#bc8cff" stroke-width="1.5"/>
+<rect x="354" y="386" width="6" height="46" rx="3" fill="#bc8cff"/>
+<text x="374" y="406" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">MCP firewall</text>
+<text x="374" y="424" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start">pinning · poisoning scan · secret egress</text>
+<rect x="815" y="90" width="255" height="330" rx="12" fill="#0f2a1a" stroke="#3fb950" stroke-width="1.5"/>
+<text x="942" y="126" fill="#3fb950" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="middle">YOUR MACHINE</text>
+<text x="837" y="156" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✕</text>
+<text x="861" y="156" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start">~/.ssh  ~/.aws  ~/.kube</text>
+<text x="837" y="184" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✕</text>
+<text x="861" y="184" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start">other projects &amp; dotfiles</text>
+<text x="837" y="212" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✕</text>
+<text x="861" y="212" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start">tokens in env variables</text>
+<text x="837" y="240" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✕</text>
+<text x="861" y="240" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start">.env / keys in the project</text>
+<text x="837" y="268" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✕</text>
+<text x="861" y="268" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start">Docker · ssh-agent · keyring</text>
+<text x="837" y="296" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✕</text>
+<text x="861" y="296" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start">clipboard · keychain (macOS)</text>
+<text x="837" y="338" fill="#3fb950" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✓</text>
+<text x="861" y="338" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" text-anchor="start">a copy of the project</text>
+<text x="837" y="366" fill="#3fb950" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">✓</text>
+<text x="861" y="366" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" text-anchor="start">only the hosts you allow</text>
+<line x1="272" y1="255" x2="326" y2="255" stroke="#f85149" stroke-width="2.5" marker-end="url(#af85149)"/>
+<line x1="772" y1="255" x2="811" y2="255" stroke="#3fb950" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#a3fb950)"/>
+<text x="550" y="488" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" text-anchor="middle">The boundary is enforced by the operating system and applies to every child process.</text>
+</svg>

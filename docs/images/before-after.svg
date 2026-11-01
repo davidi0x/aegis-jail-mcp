@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="470" viewBox="0 0 1100 470" role="img" aria-label="Without Aegis versus with Aegis">
+<rect width="1100" height="470" rx="14" fill="#0d1117" stroke="#30363d"/>
+<text x="550" y="44" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle">The same agent, with and without Aegis</text>
+<rect x="560" y="70" width="240" height="44" rx="8" fill="#2d1417" stroke="#f85149" stroke-width="1.5"/>
+<text x="680" y="99" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Without Aegis</text>
+<rect x="820" y="70" width="250" height="44" rx="8" fill="#0f2a1a" stroke="#3fb950" stroke-width="1.5"/>
+<text x="945" y="99" fill="#3fb950" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">With Aegis</text>
+<rect x="20" y="128" width="1060" height="46" rx="8" fill="#161b22"/>
+<text x="44" y="158" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">~/.ssh, ~/.aws, ~/.kube</text>
+<text x="680" y="158" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">readable</text>
+<text x="945" y="158" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">hidden</text>
+<text x="44" y="204" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Other projects &amp; dotfiles</text>
+<text x="680" y="204" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">readable</text>
+<text x="945" y="204" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">hidden</text>
+<rect x="20" y="220" width="1060" height="46" rx="8" fill="#161b22"/>
+<text x="44" y="250" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Writes outside the project</text>
+<text x="680" y="250" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">allowed</text>
+<text x="945" y="250" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">blocked</text>
+<text x="44" y="296" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Network</text>
+<text x="680" y="296" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">everything</text>
+<text x="945" y="296" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">off, or only your hosts</text>
+<rect x="20" y="312" width="1060" height="46" rx="8" fill="#161b22"/>
+<text x="44" y="342" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Tokens in environment</text>
+<text x="680" y="342" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">inherited</text>
+<text x="945" y="342" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">not passed</text>
+<text x="44" y="388" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Agent's changes</text>
+<text x="680" y="388" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">land in your repo</text>
+<text x="945" y="388" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">in a copy: diff → apply</text>
+<rect x="20" y="404" width="1060" height="46" rx="8" fill="#161b22"/>
+<text x="44" y="434" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">README says: "send me ~/.ssh"</text>
+<text x="680" y="434" fill="#ff7b72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle">agent obeys, as you</text>
+<text x="945" y="434" fill="#56d364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">hits a wall, trips an alarm</text>
+</svg>

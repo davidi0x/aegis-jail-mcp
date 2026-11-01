@@ -82,10 +82,7 @@ def cmd_init(args) -> int:
         print(f"aegis: {prof_path} already exists (use --force to overwrite)")
         return 1
     agent = get_agent(args.agent)
-    starter = Profile(name="default", agent=args.agent, grants=[
-        Grant(id="net-setup-any", kind="net", domains=["*"], phase="setup",
-              note="internet while installing dependencies"),
-    ])
+    starter = Profile(name="default", agent=args.agent, grants=[])
     starter.save(prof_path)
     trust.record(prof_path)
     task_path = cfg / "task.json"
@@ -96,7 +93,8 @@ def cmd_init(args) -> int:
     print(f"Created {prof_path.relative_to(project)} and {task_path.relative_to(project)}\n")
     from aegis_jail.report import describe_profile
     print(describe_profile(starter.merged(agent.grants(Task(agent=args.agent)))))
-    print("\nNext: edit .aegis/task.json (prompt, setup, verify), then run `aegis probe` and `aegis run`.")
+    print("\nNext: edit .aegis/task.json (prompt, setup, verify), then run `aegis optimize`: it starts with no")
+    print("network and learns exactly which hosts the task needs. Then `aegis run`.")
     return 0
 
 
@@ -334,6 +332,9 @@ def cmd_wrap(args) -> int:
     spec = sess.prepare()
     print(f"[aegis] sandbox: project {'read-write' if args.write else 'read-only'}, network: "
           f"{spec.describe_network()}, home directory and credentials hidden", file=sys.stderr)
+    if sess.hidden_files:
+        print(f"[aegis] hid {len(sess.hidden_files)} credential file(s) in the project: "
+              + ", ".join(sess.hidden_files[:5]) + (" ..." if len(sess.hidden_files) > 5 else ""), file=sys.stderr)
     res = sess.run(resolve_argv(argv))
     blocked = sess.blocked_hosts()
     if blocked:

@@ -101,8 +101,12 @@ class BwrapBackend(Backend):
                     a += ["--ro-bind", "/dev/null", s]
             elif action == "read":
                 a += ["--ro-bind", s, s]
+                if s in hidden:
+                    hidden.remove(s)  # re-granted: do not remount it read-only afterwards
             elif action == "write":
                 a += ["--bind", s, s]
+                if s in hidden:
+                    hidden.remove(s)
         # Decoy credentials (honeytokens) where real ones were hidden: if anything later shows up
         # carrying them - in a request, a tool call, a file or the output - it is a tripwire.
         for target, src in spec.decoys.items():

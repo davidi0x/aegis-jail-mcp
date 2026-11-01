@@ -14,6 +14,10 @@ Thanks for helping make AI agents safer to use!
 - **Probe checks:** new escape attempts for `aegis_jail/probe.py`.
 - **MCP servers:** tested `aegis mcp-jail` recipes for popular servers (which hosts and env vars they need).
 
+## Pictures in the README
+
+The images in `docs/images/` are generated: terminal screenshots from *real* command output, diagrams from code. After changing what a command prints, re-capture it and run `python3 scripts/make_images.py --demo demo.txt --optimize optimize.txt --scan scan.txt` (see the docstring in that script).
+
 ## Running tests
 
 ```sh

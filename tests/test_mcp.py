@@ -169,3 +169,45 @@ class McpJailTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SessionTest(unittest.TestCase):
+    """`aegis wrap` / `mcp-jail` run against the real project: writable only on request, secrets masked."""
+
+    def _run(self, project, write, code):
+        from aegis_jail.policy import Profile
+        from aegis_jail.session import Session
+        backend_or_skip(self)
+        sess = Session(project=project, profile=Profile("d", "command", []), write=write)
+        sess.prepare()
+        devnull = os.open(os.devnull, os.O_RDONLY)
+        with tempfile.TemporaryFile() as out:
+            sess.run([sys.executable, "-c", code], stdio=(devnull, out.fileno(), out.fileno()))
+            out.seek(0)
+            text = out.read().decode(errors="replace")
+        os.close(devnull)
+        return sess, text
+
+    def test_write_flag_and_masked_secrets(self):
+        isolated_aegis_home()
+        project = demo_copy()
+        try:
+            (project / ".env").write_text(f"STRIPE={fake_stripe()}\n")
+            code = ("open('made.txt','w').write('ok')\n"
+                    "try:\n    print('ENV=' + open('.env').read())\nexcept Exception as e:\n    print('ENVERR')\n")
+            sess, text = self._run(project, True, code)
+            self.assertEqual((project / "made.txt").read_text(), "ok", text)
+            self.assertNotIn(fake_stripe(), text)
+            self.assertIn(".env", sess.hidden_files)
+            self.assertEqual((project / ".env").read_text(), f"STRIPE={fake_stripe()}\n")  # untouched on the host
+        finally:
+            shutil.rmtree(project.parent, ignore_errors=True)
+
+    def test_read_only_by_default(self):
+        isolated_aegis_home()
+        project = demo_copy()
+        try:
+            self._run(project, False, "try:\n    open('nope.txt','w').write('x')\nexcept Exception: pass\n")
+            self.assertFalse((project / "nope.txt").exists())
+        finally:
+            shutil.rmtree(project.parent, ignore_errors=True)

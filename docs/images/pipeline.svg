@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="300" viewBox="0 0 1100 300" role="img" aria-label="How an Aegis run works: copy, setup, agent, verify, report, you decide">
+<defs><marker id="a58a6ff" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker></defs>
+<rect width="1100" height="300" rx="14" fill="#0d1117" stroke="#30363d"/>
+<text x="550" y="42" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle">How a run works</text>
+<rect x="30" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="92.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Project</text>
+<text x="92.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">your repo</text>
+<line x1="156" y1="142" x2="172" y2="142" stroke="#58a6ff" stroke-width="2.5" marker-end="url(#a58a6ff)"/>
+<rect x="174" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="236.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Copy</text>
+<text x="236.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">secrets left out</text>
+<line x1="300" y1="142" x2="316" y2="142" stroke="#58a6ff" stroke-width="2.5" marker-end="url(#a58a6ff)"/>
+<rect x="318" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text x="380.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Setup</text>
+<text x="380.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">npm ci ...</text>
+<line x1="444" y1="142" x2="460" y2="142" stroke="#58a6ff" stroke-width="2.5" marker-end="url(#a58a6ff)"/>
+<rect x="462" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+<text x="524.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Agent</text>
+<text x="524.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">does the task</text>
+<line x1="588" y1="142" x2="604" y2="142" stroke="#58a6ff" stroke-width="2.5" marker-end="url(#a58a6ff)"/>
+<rect x="606" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text x="668.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Verify</text>
+<text x="668.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">npm test</text>
+<line x1="732" y1="142" x2="748" y2="142" stroke="#58a6ff" stroke-width="2.5" marker-end="url(#a58a6ff)"/>
+<rect x="750" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="812.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Report</text>
+<text x="812.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">diff + alerts</text>
+<line x1="876" y1="142" x2="892" y2="142" stroke="#58a6ff" stroke-width="2.5" marker-end="url(#a58a6ff)"/>
+<rect x="894" y="100" width="124" height="84" rx="12" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="956.0" y="134" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">You decide</text>
+<text x="956.0" y="158" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle">apply / discard</text>
+<rect x="308" y="84" width="432" height="116" rx="16" fill="none" stroke="#58a6ff" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="524.0" y="78" fill="#58a6ff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="middle">inside the OS sandbox · no home dir · no keys · network off or allowlisted</text>
+<text x="550" y="242" fill="#e6edf3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">Nothing reaches your real project until you run  aegis apply.</text>
+<text x="550" y="270" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="middle">Changes that could run code outside the sandbox (hooks, CI, MCP config, scripts) need an explicit yes.</text>
+</svg>

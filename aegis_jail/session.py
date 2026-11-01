@@ -35,9 +35,12 @@ class Session:
     proxy: FilteringProxy | None = field(default=None, init=False)
     spec: SandboxSpec | None = field(default=None, init=False)
     tmp: Path | None = field(default=None, init=False)
+    hidden_files: list[str] = field(default_factory=list, init=False)
 
     def prepare(self) -> SandboxSpec:
+        from aegis_jail import workspace
         self.project = self.project.resolve()
+        workspace.check_project_root(self.project)
         self.backend = self.backend or get_backend()
         self.tmp = paths.aegis_home() / "sessions" / secrets.token_hex(6)
         self.tmp.mkdir(parents=True)
@@ -47,6 +50,12 @@ class Session:
             # Same rules, but the project becomes read-only instead of writable.
             spec.fs_rules = [("read", p) if (a == "write" and p == self.project) else (a, p)
                              for a, p in spec.fs_rules]
+        # The command sees the real project, so credential files inside it (.env, keys, files that
+        # contain tokens) are masked, exactly as they are left out of an `aegis run` working copy.
+        hidden = workspace.find_secret_files(self.project, self.profile.expose_globs())
+        self.hidden_files = sorted(hidden)
+        for rel in self.hidden_files:
+            spec.fs_rules.append(("deny", self.project / rel))
         self.spec = spec
         if isinstance(spec.network, list):
             linux = self.backend.name == "linux-bwrap"

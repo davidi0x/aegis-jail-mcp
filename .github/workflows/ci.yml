@@ -37,5 +37,8 @@ jobs:
         run: aegis demo
       - name: Boundary probe on the demo project
         run: aegis probe --project aegis_jail/demo
+      - name: README links, anchors and images
+        if: runner.os == 'Linux'
+        run: python scripts/check_docs.py
       - name: Plugin entry point works without installation
         run: python scripts/aegis.py --version

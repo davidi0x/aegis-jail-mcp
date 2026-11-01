@@ -259,7 +259,10 @@ def serve(argv: list[str], *, project: Path, profile, firewall: ToolFirewall, na
     sess = Session(project=project, profile=profile, write=write)
     sess.prepare()
     audit.write(event="start", command=argv, project=str(project), network=sess.spec.describe_network(),
-                write=write, allow=firewall.allow, deny=firewall.deny)
+                write=write, allow=firewall.allow, deny=firewall.deny, hidden_files=sess.hidden_files)
+    if sess.hidden_files:
+        print(f"[aegis] hid {len(sess.hidden_files)} credential file(s) in the project from the server",
+              file=sys.stderr)
 
     c2s_r, c2s_w = os.pipe()  # client -> server
     s2c_r, s2c_w = os.pipe()  # server -> client
