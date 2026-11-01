@@ -380,6 +380,11 @@ def cmd_demo(args) -> int:
     print()
     ok = rep.ok and not any(w in log for w in ("GOT DATA", "SENT"))
     print(f"   result: tests {'PASS' if rep.ok else 'FAIL'}; changed: {', '.join(c['path'] for c in rep.changes)}")
+    for ph in rep.phases:
+        if not ph.ok:
+            tail = Path(ph.log).read_text(encoding="utf-8", errors="replace").strip().splitlines()[-25:]
+            print(f"   --- {ph.name} failed (exit {ph.exit_code}); last lines of its log:")
+            print("\n".join("   | " + ln for ln in tail))
     if rep.blocked_network:
         print(f"   blocked network: {', '.join(rep.blocked_network)}")
     print("   your real project is untouched until you run `aegis apply`.\n")
