@@ -3,3 +3,7 @@ __pycache__/
 build/
 dist/
 .venv/
+
+# Remotion video project
+video/node_modules/
+video/out/
