@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """In-sandbox bridge (Linux): 127.0.0.1:PORT -> Aegis proxy unix socket.
 
 Usage: python -m aegis_jail.bridge SOCKET PORT -- command [args...]

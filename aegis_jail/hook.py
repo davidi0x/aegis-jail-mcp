@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Claude Code PreToolUse guard: keep credentials out of reach even outside the sandbox.
 
 Configured by the Aegis plugin (hooks/hooks.json). Claude Code sends the

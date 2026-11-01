@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue" alt="Linux, macOS, Windows">
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero dependencies">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-green" alt="AGPL-3.0"></a>
 </p>
 
 <p align="center">
@@ -235,7 +235,7 @@ project ──copy──► working copy ──► [setup] ──► [agent] ─
 
 | | Files | Network |
 |---|---|---|
-| **Linux** | bubblewrap: read-only root; hidden paths become empty read-only tmpfs (with decoys); `/run` and Docker sockets replaced; own user/PID/IPC/cgroup namespaces, no nested user namespaces | always a private network namespace; the only way out is a bridge to Aegis's proxy (ports, SNI and secrets checked) |
+| **Linux** | bubblewrap: read-only root; hidden paths become empty read-only tmpfs (with decoys); `/run` and Docker sockets replaced; own user/PID/IPC/cgroup namespaces, no nested user namespaces; **seccomp** blocklist of ~27 escape/exploit syscalls (ptrace, bpf, perf_event_open, keyring, module loading, mount…) | always a private network namespace; the only way out is a bridge to Aegis's proxy (ports, SNI and secrets checked) |
 | **macOS** | Seatbelt profile generated per run, with order-independent rules; AppleEvents, LaunchServices, clipboard and keychain blocked | outbound denied except Aegis's proxy port; host unix sockets blocked |
 | **Windows** | AppContainer plus allow-only ACLs, so denied paths are carved out of grants and never covered | no network capability; allowlists via the proxy and a loopback exemption |
 
@@ -245,7 +245,7 @@ CI runs every sandbox test, the demo and the boundary probe on Ubuntu, macOS and
 
 - **Evidence, not proof.** `optimize` shows that *these tasks* pass with a profile. Agents are nondeterministic, so use `--confirm 2` or more.
 - **Host allowlists go through an HTTP(S) proxy.** Programs that ignore `HTTPS_PROXY` are blocked, not let through. TLS contents are not inspected, so keep allowlists small: an allowed host can still receive data.
-- **macOS:** the most dangerous Mach services are blocked, not all of them. **Linux:** no seccomp filter yet. Decoys are Linux-only.
+- **macOS:** the most dangerous Mach services are blocked, not all of them. Decoys are Linux-only (macOS/Windows hide the real files instead of replacing them).
 - **The guard hook** is pattern matching for unsandboxed sessions. The real boundary is `aegis run` / `wrap` / `mcp-jail`.
 - **Detectors** (`aegis scan`, injection and poisoning filters) are heuristics: high recall, and they need human reading.
 - **Adapters:** Claude Code is checked to start inside the sandbox. The Codex, Gemini and Aider adapters follow their documented CLIs and need real-world reports.
@@ -266,4 +266,8 @@ AEGIS_REQUIRE_SANDBOX=1 python3 -m unittest discover -s tests -t . -v
 python3 scripts/aegis.py demo       # run from the checkout, no install
 ```
 
-Product concept (Polish): [docs/KONCEPCJA.md](docs/KONCEPCJA.md). License: [MIT](LICENSE).
+Product concept (Polish): [docs/KONCEPCJA.md](docs/KONCEPCJA.md).
+
+## License and the name
+
+Aegis is **free and open source under [AGPL-3.0](LICENSE)**: use it, read it, fork it. The copyleft (including the network-use clause, §13) means anyone who builds on Aegis — even as a hosted service — must share their changes under the same license, so improvements come back to everyone instead of disappearing into a closed product. The **"Aegis" name and logo are trademarks** and are not licensed by the AGPL ([TRADEMARK.md](TRADEMARK.md)) — fork freely, but rename your distribution. Why the code stays open (and why we don't obfuscate a security tool): [docs/PROTECTING-THE-WORK.md](docs/PROTECTING-THE-WORK.md).

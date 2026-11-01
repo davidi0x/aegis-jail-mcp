@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Run a task in a protected session: working copy -> setup -> agent -> verify -> report."""
 
 from __future__ import annotations

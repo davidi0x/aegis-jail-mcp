@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Defences for text that crosses a trust boundary.
 
 Agents, repositories and MCP servers can hide things in text:

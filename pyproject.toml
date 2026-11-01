@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Least-privilege sandbox for AI agents and MCP servers: no home dir, no credentials, no network unless verified as needed."
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 keywords = ["ai", "agents", "mcp", "sandbox", "security", "least-privilege", "claude-code", "prompt-injection"]
 dependencies = []
 classifiers = [
@@ -16,6 +16,7 @@ classifiers = [
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
   "Topic :: Security",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
 ]
 
 [project.scripts]

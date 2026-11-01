@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Trust on first use for configuration that comes with a project.
 
 `.aegis/profiles/*.json` and `.aegis/task.json` live in the repository, so a

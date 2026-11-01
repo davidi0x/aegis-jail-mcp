@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """aegis - command line interface."""
 
 from __future__ import annotations
@@ -104,7 +105,9 @@ def cmd_doctor(args) -> int:
     print(f"Aegis {__version__} on {sys.platform}, Python {sys.version.split()[0]}")
     try:
         b = get_backend()
-        print(f"Sandbox backend: {b.name} - OK")
+        from aegis_jail import seccomp
+        extra = f" (+ seccomp, {len(seccomp.blocked_numbers())} syscalls blocked)" if getattr(b, "seccomp_enabled", False) else ""
+        print(f"Sandbox backend: {b.name} - OK{extra}")
     except SandboxUnavailable as e:
         print(f"Sandbox backend: NOT AVAILABLE - {e}")
         return 1

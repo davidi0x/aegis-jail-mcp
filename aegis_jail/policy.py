@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Access profiles: what an agent session may read, write and connect to.
 
 A profile is a list of *grants* on top of a fixed, deny-by-default base:

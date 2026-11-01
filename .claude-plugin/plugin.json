@@ -5,6 +5,6 @@
   "author": { "name": "IwanskyDD" },
   "homepage": "https://github.com/IwanskyDD/aegis-mcp-jail",
   "repository": "https://github.com/IwanskyDD/aegis-mcp-jail",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "keywords": ["security", "sandbox", "mcp", "least-privilege", "prompt-injection", "secrets"]
 }

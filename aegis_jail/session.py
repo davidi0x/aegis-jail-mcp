@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Long-running sandboxed processes with stdio attached (interactive tools, MCP servers).
 
 Unlike `run_task`, which works on a throwaway copy, a session runs a command

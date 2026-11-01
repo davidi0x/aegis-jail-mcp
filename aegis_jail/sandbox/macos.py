@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """macOS backend: Seatbelt via sandbox-exec.
 
 Aegis generates an SBPL profile per run. Seatbelt applies to the process and

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Common sandbox types.
 
 A SandboxSpec is the platform-neutral result of compiling a profile for one
@@ -91,12 +92,12 @@ def proxy_env(url: str) -> dict[str, str]:
 
 
 def run_posix(argv: list[str], env: dict[str, str], cwd: Path, log_path: Path | None, timeout: float | None,
-              stdio: tuple[int, int, int] | None = None) -> RunResult:
+              stdio: tuple[int, int, int] | None = None, pass_fds: tuple[int, ...] = ()) -> RunResult:
     start = time.monotonic()
     timed_out = False
     if stdio is not None:
         proc = subprocess.Popen(argv, env=env, cwd=str(cwd), stdin=stdio[0], stdout=stdio[1], stderr=stdio[2],
-                                start_new_session=True)
+                                start_new_session=True, pass_fds=pass_fds)
         _limit(proc.pid)
         try:
             code = proc.wait()
@@ -109,7 +110,7 @@ def run_posix(argv: list[str], env: dict[str, str], cwd: Path, log_path: Path | 
     assert log_path is not None
     with open(log_path, "ab") as log:
         proc = subprocess.Popen(argv, env=env, cwd=str(cwd), stdin=subprocess.DEVNULL,
-                                stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+                                stdout=log, stderr=subprocess.STDOUT, start_new_session=True, pass_fds=pass_fds)
         _limit(proc.pid)
         try:
             code = proc.wait(timeout=timeout)

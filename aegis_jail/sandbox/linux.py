@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Linux backend: bubblewrap.
 
 Filesystem: the host root is mounted read-only; denied paths are covered by
@@ -18,6 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from aegis_jail import seccomp
 from aegis_jail.sandbox.base import Backend, RunResult, SandboxSpec, SandboxUnavailable, proxy_env, run_posix
 
 BRIDGE_PORT = 3128
@@ -30,6 +32,7 @@ class BwrapBackend(Backend):
     def __init__(self) -> None:
         self.bwrap = shutil.which("bwrap")
         self.hardening: list[str] = []
+        self.seccomp: bytes | None = seccomp.build_filter() if seccomp.supported() else None
 
     def check(self) -> None:
         if not self.bwrap:
@@ -50,12 +53,29 @@ class BwrapBackend(Backend):
         r = subprocess.run([self.bwrap, "--ro-bind", "/", "/", "--size", "1048576", "--tmpfs", "/tmp", "true"],
                            capture_output=True)
         self.sized_tmp = r.returncode == 0
+        if self.seccomp:  # confirm this kernel/bwrap accepts our filter; disable quietly if not
+            try:
+                rfd, wfd = os.pipe()
+                os.write(wfd, self.seccomp)
+                os.close(wfd)
+                r = subprocess.run([self.bwrap, "--ro-bind", "/", "/", "--seccomp", str(rfd), "true"],
+                                   pass_fds=(rfd,), capture_output=True)
+                os.close(rfd)
+                if r.returncode != 0:
+                    self.seccomp = None
+            except OSError:
+                self.seccomp = None
 
-    def build_argv(self, spec: SandboxSpec, argv: list[str], proxy=None) -> tuple[list[str], dict[str, str]]:
+    @property
+    def seccomp_enabled(self) -> bool:
+        return self.seccomp is not None
+
+    def build_argv(self, spec: SandboxSpec, argv: list[str], proxy=None,
+                   seccomp_fd: int | None = None) -> tuple[list[str], dict[str, str]]:
         assert self.bwrap
         tmp_size = os.environ.get("AEGIS_TMPFS_BYTES", str(1 << 30))
         a = [self.bwrap, "--die-with-parent", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
-             "--new-session", *self.hardening, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+             "--new-session", *(["--seccomp", str(seccomp_fd)] if seccomp_fd is not None else []), *self.hardening, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
              *(["--size", tmp_size] if getattr(self, "sized_tmp", False) else []), "--tmpfs", "/tmp"]
         hidden: list[str] = []
         # Host services live behind unix sockets under /run (Docker, containerd/podman, D-Bus with the
@@ -110,5 +130,16 @@ class BwrapBackend(Backend):
 
     def run(self, spec: SandboxSpec, argv: list[str], *, log_path: Path | None, timeout: float | None,
             proxy=None, stdio=None) -> RunResult:
-        full, env = self.build_argv(spec, argv, proxy)
-        return run_posix(full, env, spec.cwd, log_path, timeout, stdio)
+        fd = None
+        try:
+            if self.seccomp:
+                bpf = spec.tmp / "seccomp.bpf"
+                bpf.write_bytes(self.seccomp)
+                fd = os.open(str(bpf), os.O_RDONLY)
+                os.set_inheritable(fd, True)
+            full, env = self.build_argv(spec, argv, proxy, fd)
+            return run_posix(full, env, spec.cwd, log_path, timeout, stdio,
+                             pass_fds=(fd,) if fd is not None else ())
+        finally:
+            if fd is not None:
+                os.close(fd)

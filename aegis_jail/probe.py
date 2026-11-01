@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Boundary probes: check in practice that a profile's limits really hold.
 
 Aegis runs a small probe program *inside* the sandbox (and again in a child
@@ -94,6 +95,14 @@ def run(plan, child):
                 out[c["id"]] = "allow" if r.returncode == 0 else "deny"
             except Exception:
                 out[c["id"]] = "deny"
+        elif op == "syscall":
+            try:
+                import ctypes
+                libc = ctypes.CDLL(None, use_errno=True)
+                libc.syscall(c["nr"], 0, 0, 0, 0, 0, 0)
+                out[c["id"]] = "deny" if ctypes.get_errno() == 1 else "allow"
+            except Exception:
+                out[c["id"]] = "allow"
         elif op == "proxy":
             out[c["id"]] = via_proxy(c["host"], c["port"])
     return out
@@ -175,6 +184,9 @@ def _control_connect(host: str, port: int, via_upstream: bool) -> str:
         return "deny"
 
 
+backend_ref: dict = {}
+
+
 def build_checks(spec: SandboxSpec, project: Path, ws: Path) -> list[Check]:
     home = paths.user_home()
     tag = secrets.token_hex(4)
@@ -232,6 +244,11 @@ def build_checks(spec: SandboxSpec, project: Path, ws: Path) -> list[Check]:
         runtime = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
         base = runtime if runtime.is_dir() and os.access(runtime, os.W_OK) else paths.canary_dir()
         checks.append(Check("host-service-socket", "unix", str(base / f"aegis-{tag}.sock"), "deny"))
+    if getattr(backend_ref.get("b"), "seccomp_enabled", False):
+        from aegis_jail import seccomp as _sc
+        nr = _sc._BLOCK["ptrace"].get(_sc.arch())
+        if nr is not None:
+            checks.append(Check("seccomp-ptrace-blocked", "syscall", f"ptrace({nr})", "deny"))
     if sys.platform == "darwin":
         if "apple-events" not in spec.services:
             checks.append(Check("macos-apple-events", "exec", "/usr/bin/osascript -e 'return 1'", "deny"))
@@ -264,6 +281,7 @@ def run_probe(project: Path, profile: Profile, *, phase: str = "task", task: Tas
     tmp.mkdir()
     workspace.create(project, ws)
     spec = profile.compile(phase, project=project, workspace=ws, tmp=tmp, runtime_paths=runtime_paths())
+    backend_ref["b"] = backend
     checks = build_checks(spec, project, ws)
 
     plan = {"checks": []}
@@ -278,6 +296,9 @@ def run_probe(project: Path, profile: Profile, *, phase: str = "task", task: Tas
             item["path"] = c.target
         elif c.op == "exec":
             item["argv"] = shlex.split(c.target)
+            item["child"] = False
+        elif c.op == "syscall":
+            item["nr"] = int(c.target.split("(")[1].rstrip(")"))
             item["child"] = False
         else:
             host, _, port = c.target.rpartition(":")

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """`aegis scan`: look for what could hijack or abuse an AI agent, *before* it runs.
 
 Point it at a repository you are about to give an agent, or at a skill, plugin

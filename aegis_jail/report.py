@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Human-readable reports (Markdown) for runs, probes and optimisations."""
 
 from __future__ import annotations

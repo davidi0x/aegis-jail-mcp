@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Credential detection (data-loss prevention) used across Aegis.
 
 * the working copy hides project files that hold credentials (.env, keys, ...),

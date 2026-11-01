@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Aegis as an MCP server: lets an AI client run commands in the Aegis sandbox.
 
 Start with `aegis mcp-server` (stdio). Works with Claude Code, Claude Desktop,

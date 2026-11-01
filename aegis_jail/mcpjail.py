@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """MCP jail: run any stdio MCP server inside the Aegis sandbox, behind a protocol firewall.
 
     MCP client  <--stdio-->  aegis mcp-jail  <--pipes-->  [sandbox: the MCP server]

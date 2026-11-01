@@ -8,6 +8,7 @@ from aegis_jail import paths
 from aegis_jail.optimize import optimize
 from aegis_jail.policy import Grant, Profile, baseline_profile
 from aegis_jail.probe import run_probe
+from aegis_jail.agents import Task
 from aegis_jail.runner import run_task
 
 from tests.helpers import backend_or_skip, cleanup_aegis_home, demo_copy, demo_task, isolated_aegis_home
@@ -79,6 +80,25 @@ class SandboxTest(unittest.TestCase):
         self.assertIn("net-task-any", removed)
         self.assertEqual(res.confirmed, 1)
         self.assertIsNotNone(res.final.verified)
+
+
+class SeccompTest(unittest.TestCase):
+    def test_dangerous_syscall_blocked(self):
+        isolated_aegis_home()
+        backend = backend_or_skip(self)
+        from aegis_jail import seccomp
+        if not getattr(backend, "seccomp_enabled", False):
+            self.skipTest("seccomp not active on this host")
+        nr = seccomp._BLOCK["ptrace"][seccomp.arch()]
+        project = demo_copy()
+        try:
+            code = (f"import ctypes; libc=ctypes.CDLL(None,use_errno=True); libc.syscall({nr},0,0,0,0); "
+                    "import os; print('EPERM' if ctypes.get_errno()==1 else 'OPEN')")
+            task = Task(name="s", agent="command", command=["{python}", "-c", code], timeout=30)
+            rep = run_task(project, Profile("d", "command"), task, backend=backend, quiet=True)
+            self.assertIn("EPERM", Path(rep.phases[0].log).read_text(errors="replace"))
+        finally:
+            shutil.rmtree(project.parent, ignore_errors=True)
 
 
 if __name__ == "__main__":

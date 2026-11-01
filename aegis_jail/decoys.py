@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Decoy credentials (honeytokens).
 
 Where Aegis hides a real credential store, it can put a convincing fake in its

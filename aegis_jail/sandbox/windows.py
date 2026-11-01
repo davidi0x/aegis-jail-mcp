@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Windows backend: AppContainer.
 
 An AppContainer process starts with access to almost nothing in the user

@@ -36,6 +36,7 @@ sandbox on Linux, macOS and Windows in CI.
 | Child / background processes | Linux PID namespace and `--die-with-parent`; macOS process group reaped at the end; Windows Job object with kill-on-close | tested |
 | macOS: make *another* app do it (`osascript` → Terminal, `open -a`, `launchctl submit`) | `appleevent-send`, `lsopen`, LaunchServices lookup and those binaries denied | tested on macOS |
 | Nested user namespaces as a kernel attack surface | `--disable-userns` | |
+| Kernel attack surface via rare syscalls (ptrace, bpf, perf_event_open, keyring, module loading, kexec, mount, raw I/O…) | seccomp blocklist returning EPERM (x86-64 / aarch64; `AEGIS_SECCOMP=0` to disable) | tested |
 | Fill RAM through `/tmp` | `/tmp` tmpfs size-capped (`AEGIS_TMPFS_BYTES`); single-file size capped | |
 | Windows: Aegis killed mid-run leaves ACLs behind | ACL journal; stale entries cleaned on the next start | |
 
@@ -89,7 +90,7 @@ Where Aegis hides a credential store on Linux, it plants a **decoy** with a per-
 ## Known limits
 - Domain allowlists rely on programs honouring `HTTPS_PROXY`. Others are blocked, not let through.
 - Content inside TLS is not inspected (no MITM). Exfiltration *to an allowed host* is possible, so keep allowlists small.
-- Seccomp syscall filtering is not used yet on Linux; the boundary is namespaces and mounts.
+- Seccomp is a blocklist of known-dangerous syscalls, not a strict allowlist, and covers x86-64 / aarch64 only; the primary boundary remains namespaces and mounts.
 - The Claude Code hook is a best-effort guard for **unsandboxed** sessions. It normalises common shell tricks, but determined obfuscation can beat string matching. Use `aegis run` / `wrap` / `mcp-jail` for a real boundary.
 - Decoys are Linux-only for now (macOS and Windows cannot put a fake file over a real one without touching your home).
 - `aegis scan` and the injection detectors are heuristics: high recall, and they need human reading.

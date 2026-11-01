@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Working copies: the agent never touches the real project directly.
 
 Aegis copies the project into the run directory, the agent works there, and
