@@ -42,8 +42,9 @@ class Task:
 
     def expand(self, s: str) -> str:
         """Substitute {python} so task files work on every OS."""
-        return s.replace("{python}", subprocess.list2cmdline([sys.executable]) if os.name == "nt"
-                         else shlex.quote(sys.executable))
+        # Always quoted on Windows: cmd.exe inside an AppContainer cannot start an
+        # unquoted absolute path (it probes parent directories it may not list).
+        return s.replace("{python}", f'"{sys.executable}"' if os.name == "nt" else shlex.quote(sys.executable))
 
     def fingerprint(self) -> str:
         blob = json.dumps(asdict(self), sort_keys=True).encode()
