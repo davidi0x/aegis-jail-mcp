@@ -276,7 +276,10 @@ class AppContainerBackend(Backend):
             si.lpAttributeList = ctypes.cast(attr, LPVOID)
 
             cmdline = ctypes.create_unicode_buffer(" ".join(_quote_arg(a) for a in argv))
-            env_block = ctypes.create_unicode_buffer("".join(f"{k}={v}\0" for k, v in sorted(env.items())) + "\0")
+            # Note: create_unicode_buffer() would stop at the first NUL, truncating the block.
+            block = "".join(f"{k}={v}\0" for k, v in sorted(env.items(), key=lambda kv: kv[0].upper())) + "\0"
+            env_block = (ctypes.c_wchar * len(block))()
+            env_block[:] = block
             flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW
             if not kernel32.CreateProcessW(None, cmdline, None, None, True, flags, env_block, str(cwd),
                                            ctypes.byref(si), ctypes.byref(pi)):
