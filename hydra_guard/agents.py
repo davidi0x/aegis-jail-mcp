@@ -46,7 +46,8 @@ class Task:
 
 def shell(cmd: str) -> list[str]:
     if os.name == "nt":
-        return [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/s", "/c", cmd]
+        comspec = os.environ.get("COMSPEC") or os.path.join(os.environ.get("SYSTEMROOT", r"C:\Windows"), "System32", "cmd.exe")
+        return [comspec, "/d", "/s", "/c", cmd]
     return ["/bin/sh", "-c", cmd]
 
 

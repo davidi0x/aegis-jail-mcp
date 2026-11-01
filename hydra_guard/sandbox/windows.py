@@ -150,10 +150,6 @@ def _icacls(*args: str) -> None:
         raise RuntimeError(f"icacls {' '.join(args)} failed: {r.stdout.strip()} {r.stderr.strip()}")
 
 
-def _quote_arg(a: str) -> str:
-    return subprocess.list2cmdline([a])
-
-
 class AppContainerBackend(Backend):
     name = "windows-appcontainer"
 
@@ -164,26 +160,33 @@ class AppContainerBackend(Backend):
             raise SandboxUnavailable("AppContainer needs Windows 8 / Server 2012 or newer")
 
     # -- ACL management --------------------------------------------------
+    @staticmethod
+    def plan_acls(rules: list[tuple[str, Path]]) -> list[tuple[Path, str, bool]]:
+        """Turn last-match-wins rules into allow-only ACEs: (path, "RX"|"M", inheritable).
+
+        AppContainers start with no access, so Hydra never needs deny ACEs:
+        a grant that contains a denied sub-path is "carved" - the directory
+        itself is made listable and each child is granted separately, except
+        the denied one. (Deny ACEs for package SIDs proved unreliable.)
+        """
+        out: list[tuple[Path, str, bool]] = []
+        for i, (action, a) in enumerate(rules):
+            if action not in ("read", "write") or not a.exists():
+                continue
+            later_denies = [d for act, d in rules[i + 1:] if act == "deny"]
+            if any(_within(a, d) for d in later_denies):
+                continue
+            perm = "M" if action == "write" else "RX"
+            inside = [d for d in later_denies if _within(d, a)]
+            _carve(a, perm, inside, out)
+        return out
+
     def _apply_acls(self, spec: SandboxSpec, sid: str) -> list[Path]:
         touched: list[Path] = []
-        allowed: list[Path] = []
-        for action, p in spec.fs_rules:
-            if not p.exists():
-                continue
-            if action in ("read", "write"):
-                perm = "(OI)(CI)(M)" if action == "write" else "(OI)(CI)(RX)"
-                if p.is_file():
-                    perm = "(M)" if action == "write" else "(RX)"
-                _icacls(str(p), "/grant", f"*{sid}:{perm}", "/Q")
-                touched.append(p)
-                allowed.append(p)
-            elif action == "deny":
-                # AppContainers see nothing by default; a deny ACE is needed
-                # only where an earlier grant would otherwise expose the path.
-                if any(_within(p, a) for a in allowed):
-                    perm = "(OI)(CI)(F)" if p.is_dir() else "(F)"
-                    _icacls(str(p), "/deny", f"*{sid}:{perm}", "/Q")
-                    touched.append(p)
+        for path, perm, inherit in self.plan_acls(spec.fs_rules):
+            flags = "(OI)(CI)" if inherit and path.is_dir() else ""
+            _icacls(str(path), "/grant", f"*{sid}:{flags}({perm})", "/Q")
+            touched.append(path)
         return touched
 
     def _remove_acls(self, touched: list[Path], sid: str) -> None:
@@ -275,7 +278,7 @@ class AppContainerBackend(Backend):
             si.StartupInfo.hStdError = h_out
             si.lpAttributeList = ctypes.cast(attr, LPVOID)
 
-            cmdline = ctypes.create_unicode_buffer(" ".join(_quote_arg(a) for a in argv))
+            cmdline = ctypes.create_unicode_buffer(_cmdline(argv))
             # Note: create_unicode_buffer() would stop at the first NUL, truncating the block.
             block = "".join(f"{k}={v}\0" for k, v in sorted(env.items(), key=lambda kv: kv[0].upper())) + "\0"
             env_block = (ctypes.c_wchar * len(block))()
@@ -316,7 +319,32 @@ class AppContainerBackend(Backend):
 
 def _within(child: Path, parent: Path) -> bool:
     try:
-        child.relative_to(parent)
+        Path(str(child).lower()).relative_to(Path(str(parent).lower()))
         return True
     except ValueError:
         return False
+
+
+def _carve(path: Path, perm: str, denies: list[Path], out: list[tuple[Path, str, bool]]) -> None:
+    if any(_within(path, d) for d in denies):
+        return
+    inside = [d for d in denies if _within(d, path)]
+    if not inside or not path.is_dir():
+        out.append((path, perm, True))
+        return
+    out.append((path, "RX", False))  # list / traverse this directory only
+    try:
+        children = list(path.iterdir())
+    except OSError:
+        return
+    for child in children:
+        _carve(child, perm, [d for d in inside if _within(d, child)], out)
+
+
+def _cmdline(argv: list[str]) -> str:
+    # cmd.exe does not understand the backslash-escaped quotes produced by
+    # list2cmdline, so `cmd /d /s /c "<command>"` is passed verbatim.
+    if (len(argv) == 5 and argv[0].replace("\\", "/").rsplit("/", 1)[-1].lower() == "cmd.exe"
+            and [a.lower() for a in argv[1:4]] == ["/d", "/s", "/c"]):
+        return f'{subprocess.list2cmdline([argv[0]])} /d /s /c "{argv[4]}"'
+    return subprocess.list2cmdline(argv)
