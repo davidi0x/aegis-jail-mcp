@@ -24,7 +24,11 @@ from typing import Any
 
 from aegis_jail import paths
 
-KINDS = ("read", "write", "net", "env")
+# read/write: paths · net: hosts · env: variable names ·
+# expose: project files that look like credentials but the agent may see (globs) ·
+# service: OS services normally blocked (macOS: "keychain", "clipboard", "apple-events", "open-apps")
+KINDS = ("read", "write", "net", "env", "expose", "service")
+SERVICES = ("keychain", "clipboard", "apple-events", "open-apps")
 PHASES = ("setup", "task", "all")
 
 # Environment variables that are always passed through.
@@ -63,6 +67,14 @@ class Grant:
             raise ValueError(f"grant {self.id!r}: net grant needs domains")
         if self.kind == "env" and not self.names:
             raise ValueError(f"grant {self.id!r}: env grant needs names")
+        if self.kind == "expose" and not self.path:
+            raise ValueError(f"grant {self.id!r}: expose grant needs a path glob, e.g. \".env\"")
+        if self.kind == "service" and not set(self.names or []) <= set(SERVICES):
+            raise ValueError(f"grant {self.id!r}: services must be among {', '.join(SERVICES)}")
+        if self.kind == "net":
+            for d in self.domains or []:
+                if not isinstance(d, str) or not d or any(c in d for c in " /\\@"):
+                    raise ValueError(f"grant {self.id!r}: invalid host pattern {d!r}")
 
     def applies_to(self, phase: str) -> bool:
         return self.phase == "all" or self.phase == phase
@@ -77,6 +89,10 @@ class Grant:
             doms = ("any host" if "*" in (self.domains or []) else
                     "any host (logged)" if "**" in (self.domains or []) else ", ".join(self.domains or []))
             return f"network to {doms}{where}"
+        if self.kind == "expose":
+            return f"show project file(s) {self.path} to the agent"
+        if self.kind == "service":
+            return f"OS services: {', '.join(self.names or [])}"
         return f"env vars {', '.join(self.names or [])}"
 
     def to_dict(self) -> dict[str, Any]:
@@ -117,6 +133,9 @@ class Profile:
         path.write_text(json.dumps(self.to_dict(), indent=2) + "\n", encoding="utf-8")
 
     # ---- manipulation --------------------------------------------------
+    def expose_globs(self) -> list[str]:
+        return [g.path for g in self.grants if g.kind == "expose" and g.path]
+
     def without(self, grant_id: str) -> "Profile":
         return Profile(self.name, self.agent, [g for g in self.grants if g.id != grant_id], None)
 
@@ -132,7 +151,10 @@ class Profile:
 
         home = paths.user_home()
         host_env = dict(os.environ if host_env is None else host_env)
-        rules: list[tuple[str, Path]] = [("deny", home)]
+        rules: list[tuple[str, Path]] = []
+        if home.parent in (Path("/home"), Path("/Users")):
+            rules.append(("deny", home.parent))  # other users' files
+        rules.append(("deny", home))
         # Aegis's own runtime (interpreter, package) must stay readable.
         for rp in runtime_paths or []:
             rules.append(("read", rp.resolve()))
@@ -142,11 +164,19 @@ class Profile:
                 p = paths.expand(g.path or "", home).resolve()
                 rules.append((g.kind, p))
                 granted_paths.append(p)
+        hidden_secrets: list[Path] = []
         for s in paths.SECRET_PATHS:
             sp = paths.expand(s, home)
             explicitly = any(_is_within(gp, sp) for gp in granted_paths)
             if not explicitly:
                 rules.append(("deny", sp))
+                hidden_secrets.append(sp)
+                try:
+                    real = sp.resolve()
+                except OSError:
+                    real = sp
+                if real != sp:  # a symlinked credential store must be hidden where it really lives
+                    rules.append(("deny", real))
         rules.append(("deny", project.resolve()))
         rules.append(("deny", paths.aegis_home()))
         rules.append(("write", workspace.resolve()))
@@ -157,7 +187,12 @@ class Profile:
             if g.kind == "net" and g.applies_to(phase):
                 domains.extend(g.domains or [])
         network: None | str | list[str]
-        if "*" in domains:
+        if "*" in domains and sys.platform.startswith("linux") and os.environ.get("AEGIS_HOST_NETWORK") != "1":
+            # Linux: even "unrestricted" stays in a private network namespace and goes through the
+            # proxy, so host-only services (abstract unix sockets, X11, D-Bus, localhost ports) and
+            # DNS stay out of reach and requests are still logged / checked for secrets.
+            network = ["*"]
+        elif "*" in domains:
             network = "all"
         elif "**" in domains:
             network = ["**"]  # anything, but through the logging proxy (used to learn needed hosts)
@@ -176,7 +211,12 @@ class Profile:
             env["USERPROFILE"] = str(home)
         env["TMPDIR"] = env["TMP"] = env["TEMP"] = str(tmp.resolve())
         env["AEGIS_SANDBOX"] = "1"
-        return SandboxSpec(fs_rules=rules, network=network, env=env, cwd=workspace.resolve(), tmp=tmp.resolve())
+        from aegis_jail import decoys
+        home_hidden = not any(_is_within(home, gp) for gp in granted_paths)
+        decoy_map = decoys.prepare(tmp, hidden_secrets, home_hidden)
+        services = {n for g in self.grants if g.kind == "service" and g.applies_to(phase) for n in (g.names or [])}
+        return SandboxSpec(fs_rules=rules, network=network, env=env, cwd=workspace.resolve(), tmp=tmp.resolve(),
+                           services=services, decoys=decoy_map)
 
 
 # macOS and Windows file systems are case-insensitive by default; the

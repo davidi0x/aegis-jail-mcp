@@ -33,8 +33,15 @@ class SandboxTest(unittest.TestCase):
         rep = run_task(self.project, Profile("default", "command"), demo_task(), backend=self.backend, quiet=True)
         log = Path(rep.phases[0].log).read_text(errors="replace")
         self.assertTrue(rep.ok, log)
-        self.assertNotIn("GOT DATA", log)
         self.assertNotIn(canary.strip(), log)
+        from aegis_jail import decoys, secretscan
+        # Whatever the agent managed to "read" must be a decoy, never a real credential.
+        for line in log.splitlines():
+            if (line.startswith("[agent] read ") and "Error" not in line and "(empty)" not in line
+                    and not line.rstrip().endswith("]")):  # directory listings carry no secret
+                self.assertTrue(secretscan.is_decoy_hit(line) or line.endswith("[]"), line)
+        if decoys.enabled():
+            self.assertTrue(rep.tripwires, "decoy credentials in the output should trip the wire")
         self.assertNotIn("exfiltration: SENT", log)
         self.assertEqual([c["path"] for c in rep.changes], ["src/calc.py"])
         # The real project is untouched until `aegis apply`.
@@ -113,8 +120,9 @@ class LearnTest(unittest.TestCase):
             res = optimize(project, Profile("default", "command"), task, max_runs=8, confirm=1, backend=backend,
                            escalate=[], log=lambda _: None)
             self.assertFalse(res.baseline_failed, [t.to_dict() for t in res.trials])
-            self.assertEqual([g.id for g in res.added], ["net-task:127.0.0.1"])
-            self.assertIn("net-task:127.0.0.1", [g.id for g in res.final.grants])
+            want = f"net-task:127.0.0.1:{srv.server_address[1]}"
+            self.assertEqual([g.id for g in res.added], [want])
+            self.assertIn(want, [g.id for g in res.final.grants])
         finally:
             srv.shutdown()
             srv.server_close()

@@ -137,6 +137,9 @@ class ClaudeCodeAgent(Agent):
                          if k in os.environ] or ["ANTHROPIC_API_KEY"],
                   locked=True, note="model credentials"),
         ]
+        if sys.platform == "darwin":
+            g.append(Grant(id="claude-keychain", kind="service", names=["keychain"], locked=True,
+                           note="Claude Code stores its login in the macOS keychain"))
         g += _install_grants(_resolve(self.exe), "claude")
         node = shutil.which("node")
         if node:

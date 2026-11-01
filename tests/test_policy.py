@@ -1,3 +1,4 @@
+import sys
 import unittest
 from pathlib import Path
 
@@ -47,7 +48,8 @@ class PolicyTest(unittest.TestCase):
     def test_network_phases(self):
         grants = [Grant(id="a", kind="net", domains=["*"], phase="setup"),
                   Grant(id="b", kind="net", domains=["API.example.com"], phase="task")]
-        self.assertEqual(self.compile(grants, "setup").network, "all")
+        expected = ["*"] if sys.platform.startswith("linux") else "all"  # Linux: always via the proxy
+        self.assertEqual(self.compile(grants, "setup").network, expected)
         self.assertEqual(self.compile(grants, "task").network, ["api.example.com"])
 
     def test_env_filtered(self):

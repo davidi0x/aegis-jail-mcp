@@ -65,6 +65,9 @@ class RunReport:
     platform: str = field(default_factory=lambda: f"{platform.system()} {platform.release()} {platform.machine()}")
     agent_version: str = ""
     status: str = "pending"  # pending | applied | discarded
+    notes: list[str] = field(default_factory=list)
+    hidden: list[str] = field(default_factory=list)
+    tripwires: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -182,7 +185,8 @@ def run_task(project: Path, profile: Profile, task: Task, *, ask: Callable[[str,
     ws = rd / "workspace"
     tmp = rd / "tmp"
     tmp.mkdir()
-    baseline = workspace.create(project, ws)
+    copy = workspace.create(project, ws, profile.expose_globs())
+    baseline = copy.baseline
     workspace.save_baseline(rd / "baseline.json", baseline)
     rt = runtime_paths()
 
@@ -210,17 +214,43 @@ def run_task(project: Path, profile: Profile, task: Task, *, ask: Callable[[str,
         if not pr.ok:
             break
 
-    chs = workspace.changes(baseline, ws)
+    chs = workspace.changes(baseline, ws, project)
     report = RunReport(run_id=run_id, project=str(project), run_dir=str(rd), profile=profile.to_dict(),
                        task=task.__dict__.copy(), backend=backend.name, started=started, phases=phases,
                        changes=[c.to_dict() for c in chs], exceptions=exceptions,
-                       agent_version=agent.version(task))
+                       agent_version=agent.version(task), notes=copy.notes, hidden=sorted(copy.hidden),
+                       tripwires=find_tripwires(phases, chs, ws))
     report.save()
     return report
 
 
+def find_tripwires(phases: list[PhaseResult], chs, ws: Path) -> list[str]:
+    """Hard evidence of credential theft attempts (decoys / canary showing up anywhere)."""
+    from aegis_jail import secretscan
+    out: list[str] = []
+    for p in phases:
+        for e in p.net_events:
+            if e.get("tripwire"):
+                out.append(f"{p.name}: network: {e['host']}:{e['port']} - {e['reason']}")
+        try:
+            if secretscan.is_decoy_hit(Path(p.log).read_text(encoding="utf-8", errors="replace")):
+                out.append(f"{p.name}: decoy credentials appeared in the program's output")
+        except OSError:
+            pass
+    for c in chs:
+        if c.kind == "deleted":
+            continue
+        try:
+            data = (ws / c.path).read_bytes()[:2_000_000].decode("utf-8", "replace")
+        except OSError:
+            continue
+        if secretscan.is_decoy_hit(data):
+            out.append(f"files: decoy credentials were written into {c.path}")
+    return out
+
+
 def cleanup_run(run_dir: Path, keep_report: bool = True) -> None:
-    for name in ("workspace", "tmp"):
+    for name in ("workspace", "tmp", "tmp-decoys"):
         p = run_dir / name
         if p.exists():
             shutil.rmtree(p, ignore_errors=True)

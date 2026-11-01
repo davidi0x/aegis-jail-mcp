@@ -12,6 +12,7 @@ socket, so the only way out is through the allowlist.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,7 @@ class BwrapBackend(Backend):
 
     def __init__(self) -> None:
         self.bwrap = shutil.which("bwrap")
+        self.hardening: list[str] = []
 
     def check(self) -> None:
         if not self.bwrap:
@@ -36,12 +38,37 @@ class BwrapBackend(Backend):
                                capture_output=True, text=True)
         if probe.returncode != 0:
             raise SandboxUnavailable(f"bubblewrap cannot create namespaces here: {probe.stderr.strip()}")
+        # Optional hardening, used when this bwrap/kernel supports it:
+        #  - own user namespace (also isolates the kernel keyring) and no nested user namespaces
+        #    (shrinks kernel attack surface for escapes),
+        #  - own cgroup namespace,
+        #  - size-capped /tmp (a RAM-backed tmpfs could otherwise be used to exhaust memory).
+        for flags in (["--unshare-user", "--disable-userns"], ["--unshare-cgroup-try"]):
+            r = subprocess.run([self.bwrap, "--ro-bind", "/", "/", *flags, "true"], capture_output=True)
+            if r.returncode == 0:
+                self.hardening += flags
+        r = subprocess.run([self.bwrap, "--ro-bind", "/", "/", "--size", "1048576", "--tmpfs", "/tmp", "true"],
+                           capture_output=True)
+        self.sized_tmp = r.returncode == 0
 
     def build_argv(self, spec: SandboxSpec, argv: list[str], proxy=None) -> tuple[list[str], dict[str, str]]:
         assert self.bwrap
+        tmp_size = os.environ.get("AEGIS_TMPFS_BYTES", str(1 << 30))
         a = [self.bwrap, "--die-with-parent", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
-             "--new-session", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp"]
+             "--new-session", *self.hardening, "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+             *(["--size", tmp_size] if getattr(self, "sized_tmp", False) else []), "--tmpfs", "/tmp"]
         hidden: list[str] = []
+        # Host services live behind unix sockets under /run (Docker, containerd/podman, D-Bus with the
+        # desktop keyring, ssh-agent / gpg-agent in /run/user/UID, systemd). A read-only mount does
+        # NOT stop connect() on a socket, so these directories must be replaced, not just made read-only.
+        for d in ("/run", "/var/run", "/var/lib/docker", "/var/lib/containerd"):
+            if os.path.isdir(d) and not os.path.islink(d):
+                a += ["--tmpfs", d]
+                hidden.append(d)
+        if spec.network == "all":  # host network only with AEGIS_HOST_NETWORK=1: keep DNS working
+            for d in ("/run/systemd/resolve", "/run/NetworkManager", "/run/resolvconf"):
+                if os.path.isdir(d):
+                    a += ["--ro-bind", d, d]
         for action, p in spec.fs_rules:
             if not p.exists():
                 continue
@@ -56,6 +83,10 @@ class BwrapBackend(Backend):
                 a += ["--ro-bind", s, s]
             elif action == "write":
                 a += ["--bind", s, s]
+        # Decoy credentials (honeytokens) where real ones were hidden: if anything later shows up
+        # carrying them - in a request, a tool call, a file or the output - it is a tripwire.
+        for target, src in spec.decoys.items():
+            a += ["--ro-bind", src, target]
         # Make the empty stand-ins read-only, so writes there fail loudly instead
         # of silently landing in a throwaway tmpfs. Mounts nested inside keep
         # their own flags (e.g. the writable working copy).

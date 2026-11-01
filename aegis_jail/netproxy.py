@@ -24,6 +24,50 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlsplit
 
+from aegis_jail import secretscan
+
+
+WEB_PORTS = (80, 443)
+
+
+def target_allowed(host: str, port: int, patterns: list[str]) -> bool:
+    """Host patterns allow ports 80/443 only; "host:port" allows that exact port; "*"/"**" allow any."""
+    for p in patterns:
+        if p in ("*", "**"):
+            return True
+        hp, sep, pp = p.rpartition(":")
+        if sep and pp.isdigit() and "]" not in pp:
+            if int(pp) == port and host_allowed(host, [hp]):
+                return True
+        elif port in WEB_PORTS and host_allowed(host, [p]):
+            return True
+    return False
+
+
+def tls_sni(data: bytes) -> str | None:
+    """Server name from a TLS ClientHello, or None if absent / not TLS."""
+    try:
+        if len(data) < 43 or data[0] != 0x16 or data[5] != 0x01:
+            return None
+        i = 9 + 2 + 32  # record hdr(5) + hs hdr(4) + version + random
+        i += 1 + data[i]  # session id
+        i += 2 + int.from_bytes(data[i:i + 2], "big")  # cipher suites
+        i += 1 + data[i]  # compression
+        end = i + 2 + int.from_bytes(data[i:i + 2], "big")
+        i += 2
+        while i + 4 <= min(end, len(data)):
+            etype = int.from_bytes(data[i:i + 2], "big")
+            elen = int.from_bytes(data[i + 2:i + 4], "big")
+            if etype == 0:
+                j = i + 4 + 2
+                if data[j] == 0:
+                    n = int.from_bytes(data[j + 1:j + 3], "big")
+                    return data[j + 3:j + 3 + n].decode("ascii", "replace").lower()
+            i += 4 + elen
+    except (IndexError, ValueError):
+        return None
+    return None
+
 
 def host_allowed(host: str, patterns: list[str]) -> bool:
     host = host.lower().rstrip(".")
@@ -43,10 +87,14 @@ class NetEvent:
     port: int
     allowed: bool
     reason: str
+    tripwire: bool = False
 
     def to_dict(self) -> dict:
-        return {"time": round(self.time, 3), "host": self.host, "port": self.port,
-                "allowed": self.allowed, "reason": self.reason}
+        d = {"time": round(self.time, 3), "host": self.host, "port": self.port,
+             "allowed": self.allowed, "reason": self.reason}
+        if self.tripwire:
+            d["tripwire"] = True
+        return d
 
 
 def _pump(a: socket.socket, b: socket.socket) -> None:
@@ -147,23 +195,62 @@ class _Handler(socketserver.BaseRequestHandler):
                 return
             host, port = u.hostname, u.port or 80
         owner = self.server.owner
+        if method != "CONNECT":
+            hosthdr = next((ln.split(":", 1)[1].strip() for ln in lines[1:] if ln.lower().startswith("host:")), "")
+            if hosthdr and hosthdr.rsplit(":", 1)[0].strip("[]").lower() != host.lower():
+                owner.log(host, port, False, f"Host header {hosthdr!r} does not match the request target")
+                sock.sendall(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+                return
+            leaked = secretscan.find_secrets(data.decode("latin-1"))
+            if leaked:
+                owner.log(host, port, False, "request carries credentials: " + ", ".join(leaked), tripwire=True)
+                msg = b"Aegis blocked a request that carried credentials\n"
+                sock.sendall(b"HTTP/1.1 403 Forbidden\r\nConnection: close\r\n"
+                             + f"Content-Length: {len(msg)}\r\n\r\n".encode() + msg)
+                return
         if not owner.decide(host, port):
             msg = f"Aegis blocked network access to {host}:{port} (not in this profile's allowlist)\n".encode()
             sock.sendall(b"HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n"
                          + f"Content-Length: {len(msg)}\r\n\r\n".encode() + msg)
             return
+        first = rest
+        if method == "CONNECT":
+            sock.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
+            try:
+                sock.settimeout(15)
+                while len(first) < 5 or (first[0] == 0x16 and len(first) < 5 + int.from_bytes(first[3:5], "big")
+                                         and len(first) < 16384):
+                    chunk = sock.recv(16384)
+                    if not chunk:
+                        break
+                    first += chunk
+                    if first[:1] != b"\x16":
+                        break
+            except OSError:
+                pass
+            sni = tls_sni(first)
+            if sni and sni != host.lower() and not owner.allowed(sni, port):
+                owner.log(host, port, False, f"TLS SNI {sni!r} differs from CONNECT target (domain fronting?)",
+                          tripwire=True)
+                return
+            if first and first[:1] != b"\x16":
+                leaked = secretscan.find_secrets(first.decode("latin-1"))
+                if leaked:
+                    owner.log(host, port, False, "plaintext tunnel carries credentials: " + ", ".join(leaked),
+                              tripwire=True)
+                    return
         try:
             up = open_upstream(host, port)
         except OSError as e:
             owner.log(host, port, True, f"upstream error: {e}")
-            sock.sendall(b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
+            if method != "CONNECT":
+                sock.sendall(b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
             return
         with up:
             sock.settimeout(None)
             if method == "CONNECT":
-                sock.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
-                if rest:
-                    up.sendall(rest)
+                if first:
+                    up.sendall(first)
             else:
                 u = urlsplit(target)
                 path = (u.path or "/") + (f"?{u.query}" if u.query else "")
@@ -209,22 +296,25 @@ class FilteringProxy:
             us.owner = self
             self._servers.append(us)
 
-    def log(self, host: str, port: int, allowed: bool, reason: str) -> None:
+    def log(self, host: str, port: int, allowed: bool, reason: str, tripwire: bool = False) -> None:
         with self._lock:
-            self.events.append(NetEvent(time.time(), host, port, allowed, reason))
+            self.events.append(NetEvent(time.time(), host, port, allowed, reason, tripwire))
+
+    def allowed(self, host: str, port: int) -> bool:
+        return target_allowed(host, port, self.domains) or target_allowed(host, port, self.session_exceptions)
 
     def decide(self, host: str, port: int) -> bool:
-        if host_allowed(host, self.domains):
+        if target_allowed(host, port, self.domains):
             self.log(host, port, True, "allowlist")
             return True
-        if host_allowed(host, self.session_exceptions):
+        if target_allowed(host, port, self.session_exceptions):
             self.log(host, port, True, "session exception")
             return True
         if self.ask is not None:
             with self._lock:
                 granted = self.ask(host, port)
                 if granted:
-                    self.session_exceptions.append(host)
+                    self.session_exceptions.append(host if port in WEB_PORTS else f"{host}:{port}")
             if granted:
                 self.log(host, port, True, "session exception (granted by user)")
                 return True

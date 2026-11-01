@@ -16,6 +16,13 @@ def aegis_home() -> Path:
     env = os.environ.get("AEGIS_HOME")
     root = Path(env).expanduser() if env else user_home() / ".aegis"
     root.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        # Run directories hold copies of projects and reports: private to this user.
+        try:
+            if root.stat().st_mode & 0o077:
+                root.chmod(0o700)
+        except OSError:
+            pass
     return root.resolve()
 
 

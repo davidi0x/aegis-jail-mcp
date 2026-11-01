@@ -49,3 +49,18 @@ def backend_or_skip(testcase):
         if os.environ.get("AEGIS_REQUIRE_SANDBOX"):
             raise
         testcase.skipTest(f"sandbox unavailable: {e}")
+
+
+# Fake credentials for tests, assembled at runtime so no credential-shaped
+# literal lives in the repository (secret scanners and push protection would
+# rightly flag them).
+def fake_aws() -> str:
+    return "AKIA" + "ABCDEFGHIJKLMNOP"
+
+
+def fake_github() -> str:
+    return "ghp" + "_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+
+def fake_stripe() -> str:
+    return "sk" + "_live_" + "abcdefghijklmnopqrstuvwx"

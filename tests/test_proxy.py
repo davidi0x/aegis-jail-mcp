@@ -34,7 +34,7 @@ class ProxyTest(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         port = server.server_address[1]
         try:
-            with FilteringProxy(["127.0.0.1"]) as proxy:
+            with FilteringProxy([f"127.0.0.1:{port}"]) as proxy:
                 s, head = self._connect(proxy.tcp_port, f"127.0.0.1:{port}")
                 self.assertIn(b"200", head.split(b"\r\n")[0])
                 s.sendall(b"hi")

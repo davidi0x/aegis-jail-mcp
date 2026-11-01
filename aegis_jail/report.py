@@ -64,14 +64,24 @@ def render_run(r: "RunReport") -> str:
            f"- **Result:** {status}", f"- **Project:** `{r.project}`", f"- **Started:** {when}",
            f"- **Profile:** {r.profile.get('name')} - agent `{r.task.get('agent')}` ({r.agent_version})",
            f"- **Sandbox:** {r.backend} on {r.platform}", f"- **Aegis:** {r.aegis_version}",
-           f"- **Changes:** {r.status}", "", "## Phases", "",
+           f"- **Changes:** {r.status}", ""]
+    trip = getattr(r, "tripwires", [])
+    if trip:
+        out += ["## TRIPWIRE - likely compromised or prompt-injected agent", "",
+                "The agent handled decoy credentials that no legitimate task needs:", ""]
+        out += [f"- {t}" for t in trip]
+        out += ["", "Treat this run as hostile: review the diff carefully or discard it, and check what the agent "
+                "read (its instructions, README, issues, web pages, tool results).", ""]
+    out += ["## Phases", "",
            "| Phase | Result | Time | Network |", "|---|---|---|---|"]
     for p in r.phases:
         res = "ok" if p.ok else ("timed out" if p.timed_out else f"exit {p.exit_code}")
         out.append(f"| {p.name} | {res} | {p.duration:.1f}s | {p.network} |")
     out += ["", "## Changed files", ""]
     if r.changes:
-        out += [f"- `{c['path']}` ({c['kind']})" for c in r.changes]
+        for c in r.changes:
+            risk = f" - **RISKY:** {'; '.join(c['risks'])}" if c.get("risks") else ""
+            out.append(f"- `{c['path']}` ({c['kind']}){risk}")
     else:
         out.append("No changes.")
     out += ["", "## Blocked operations", ""]
@@ -84,13 +94,17 @@ def render_run(r: "RunReport") -> str:
         out += [f"  - `{h}`" for h in hints[:15]]
     if not blocked and not hints:
         out.append("None detected.")
+    notes = getattr(r, "notes", [])
+    if notes:
+        out += ["", "## Protection notes", ""] + [f"- {n}" for n in notes]
     out += ["", "## Exceptions used", ""]
     out += [f"- Temporary network exception for `{e}` (this session only)" for e in r.exceptions] or ["None."]
     out += ["", "## Next steps", "",
             f"- Review: `aegis diff {r.run_id}`",
             f"- Accept: `aegis apply {r.run_id}`  /  reject: `aegis discard {r.run_id}`",
             "- Logs: " + ", ".join(f"`{Path(p.log).name}`" for p in r.phases), ""]
-    return "\n".join(out)
+    from aegis_jail.textsafe import for_terminal
+    return for_terminal("\n".join(out))
 
 
 def render_probe(p: dict, regressions: list[str] | None = None) -> str:

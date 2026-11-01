@@ -77,8 +77,11 @@ def _hosts(rep: RunReport, phase_names: tuple[str, ...]) -> list[str]:
     for p in rep.phases:
         if p.name in phase_names:
             for e in p.net_events:
-                if e["host"] not in out:
-                    out.append(e["host"])
+                if not e["allowed"] or e.get("tripwire"):
+                    continue  # never learn hosts that only received blocked / credential-carrying traffic
+                h = e["host"] if e["port"] in (80, 443) else f"{e['host']}:{e['port']}"
+                if h not in out:
+                    out.append(h)
     return out
 
 

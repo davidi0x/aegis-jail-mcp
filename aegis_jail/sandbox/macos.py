@@ -63,6 +63,14 @@ class SeatbeltBackend(Backend):
                                                 "/dev/ptmx", "/dev/tty")]
                 lines.append(deny("file-write*", p, later))
         lines.append('(allow file-write* (regex #"^/dev/ttys[0-9]+$"))')
+        lines += self._escape_hatches(spec)
+        if spec.network == "all":
+            # Even with full network, host services behind unix sockets (Docker, ssh-agent, gpg-agent,
+            # databases) stay unreachable; only DNS is needed.
+            ok = ['(remote unix-socket (path-literal "/private/var/run/mDNSResponder"))',
+                  f"(remote unix-socket (subpath {_q(spec.tmp)}))", f"(remote unix-socket (subpath {_q(spec.cwd)}))"]
+            nots = " ".join(f"(require-not {o})" for o in ok)
+            lines.append(f"(deny network-outbound (require-all (remote unix-socket) {nots}))")
         if spec.network != "all":
             ok = [f"(remote unix-socket (subpath {_q(spec.tmp)}))",
                   f"(remote unix-socket (subpath {_q(spec.cwd)}))"]
@@ -73,6 +81,36 @@ class SeatbeltBackend(Backend):
             nots = " ".join(f"(require-not {o})" for o in ok)
             lines.append(f"(deny network-outbound (require-all {nots}))")
         return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _escape_hatches(spec: SandboxSpec) -> list[str]:
+        """Close the ways a sandboxed process can get *another* process to act for it.
+
+        Seatbelt confines a process and its children, but on macOS a process can ask
+        other, unsandboxed programs to do things: AppleEvents (`osascript -e 'tell app
+        "Terminal" to do script ...'`), LaunchServices (`open -a`), launchd jobs, the
+        pasteboard (often holds passwords) and the keychain daemon.
+        """
+        svc = spec.services
+        out = []
+        if "apple-events" not in svc:
+            out.append("(deny appleevent-send)")
+            out.append('(deny process-exec (literal "/usr/bin/osascript") (literal "/usr/bin/automator"))')
+        if "open-apps" not in svc:
+            out.append("(deny lsopen)")
+            out.append('(deny mach-lookup (global-name "com.apple.coreservices.launchservicesd"))')
+            out.append('(deny process-exec (literal "/usr/bin/open") (literal "/bin/launchctl"))')
+        if "clipboard" not in svc:
+            out.append('(deny mach-lookup (global-name "com.apple.pasteboard.1"))')
+            out.append('(deny process-exec (literal "/usr/bin/pbcopy") (literal "/usr/bin/pbpaste"))')
+        if "keychain" not in svc:
+            out.append('(deny mach-lookup (global-name "com.apple.SecurityServer") '
+                       '(global-name "com.apple.securityd.xpc") (global-name "com.apple.security.agent"))')
+            out.append('(deny process-exec (literal "/usr/bin/security"))')
+        out.append('(deny process-exec (literal "/usr/sbin/screencapture"))')
+        out.append('(deny mach-lookup (global-name "com.apple.screencaptureui.agent") '
+                   '(global-name "com.apple.tccd") (global-name "com.apple.tccd.system"))')
+        return out
 
     def run(self, spec: SandboxSpec, argv: list[str], *, log_path: Path | None, timeout: float | None,
             proxy=None, stdio=None) -> RunResult:

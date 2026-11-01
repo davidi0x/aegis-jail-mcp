@@ -32,6 +32,8 @@ class SandboxSpec:
     cwd: Path
     tmp: Path
     notes: list[str] = field(default_factory=list)
+    services: set[str] = field(default_factory=set)  # OS services allowed (see policy.SERVICES)
+    decoys: dict[str, str] = field(default_factory=dict)  # sandbox path -> decoy file on the host
 
     def describe_network(self) -> str:
         if self.network is None:
@@ -40,6 +42,8 @@ class SandboxSpec:
             return "unrestricted"
         if self.network == ["**"]:
             return "any host via the logging proxy"
+        if self.network == ["*"]:
+            return "any host (via proxy, logged and checked for secrets)"
         return "only " + ", ".join(self.network)
 
 
@@ -93,17 +97,20 @@ def run_posix(argv: list[str], env: dict[str, str], cwd: Path, log_path: Path | 
     if stdio is not None:
         proc = subprocess.Popen(argv, env=env, cwd=str(cwd), stdin=stdio[0], stdout=stdio[1], stderr=stdio[2],
                                 start_new_session=True)
+        _limit(proc.pid)
         try:
             code = proc.wait()
         except KeyboardInterrupt:
             os.killpg(proc.pid, signal.SIGTERM)
             code = proc.wait()
+        _reap_group(proc.pid)
         return RunResult(exit_code=code, timed_out=False, duration=time.monotonic() - start,
                          log_path=log_path or Path(os.devnull))
     assert log_path is not None
     with open(log_path, "ab") as log:
         proc = subprocess.Popen(argv, env=env, cwd=str(cwd), stdin=subprocess.DEVNULL,
                                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        _limit(proc.pid)
         try:
             code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -113,4 +120,25 @@ def run_posix(argv: list[str], env: dict[str, str], cwd: Path, log_path: Path | 
             except ProcessLookupError:
                 pass
             code = proc.wait()
+        _reap_group(proc.pid)
     return RunResult(exit_code=code, timed_out=timed_out, duration=time.monotonic() - start, log_path=log_path)
+
+
+def _limit(pid: int) -> None:
+    """No core dumps (they could hold secrets read by the process) and a cap on single-file size."""
+    try:
+        import resource
+        if hasattr(resource, "prlimit"):
+            resource.prlimit(pid, resource.RLIMIT_CORE, (0, 0))
+            fsize = int(os.environ.get("AEGIS_MAX_FILE_BYTES", str(16 << 30)))
+            resource.prlimit(pid, resource.RLIMIT_FSIZE, (fsize, fsize))
+    except (ImportError, OSError, ValueError):
+        pass
+
+
+def _reap_group(pgid: int) -> None:
+    """Kill anything the session left running in the background (daemons, watchers)."""
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass

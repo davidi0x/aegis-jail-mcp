@@ -17,15 +17,27 @@ import re
 import sys
 from pathlib import Path
 
-from aegis_jail import paths
+from aegis_jail import paths, secretscan
 
 FILE_TOOLS = {"Read", "Edit", "Write", "MultiEdit", "NotebookEdit", "NotebookRead", "Grep", "Glob", "LS"}
 SECRET_WORDS = [
     r"\.ssh/", r"\.ssh\b", r"id_rsa", r"id_ed25519", r"id_ecdsa", r"\.aws/credentials", r"\.aws\b",
     r"\.gnupg", r"\.kube/config", r"\.docker/config\.json", r"\.netrc", r"\.npmrc", r"\.pypirc",
     r"\.git-credentials", r"\.password-store", r"Library/Keychains", r"\.config/gcloud", r"\.config/gh\b",
-    r"\.azure\b", r"\.aegis/canary",
+    r"\.azure\b", r"\.aegis/canary", r"/proc/[^/\s]+/environ", r"security\s+find-(generic|internet)-password",
+    r"\bkeyctl\s+(print|read|pipe)", r"secret-tool\s+lookup", r"gh\s+auth\s+token",
 ]
+
+
+def normalize_command(cmd: str) -> str:
+    """Undo common shell obfuscation so ~/.s'sh', ~/".ssh", $HOME/.ssh and ${HOME}/.ssh all match."""
+    s = cmd.replace("\\\n", "")
+    s = re.sub(r"""['"\\]""", "", s)
+    s = re.sub(r"\$\{?HOME\}?|\$\{?USERPROFILE\}?|%USERPROFILE%", "~", s)
+    s = s.replace(str(Path.home()), "~")
+    return s
+
+
 _SECRET_RE = re.compile("|".join(SECRET_WORDS), re.I)
 
 
@@ -55,10 +67,17 @@ def check(event: dict) -> str | None:
                 return f"Aegis: {tool} on '{v}' touches a credential store; access is blocked."
     if tool == "Bash":
         cmd = str(args.get("command", ""))
-        m = _SECRET_RE.search(cmd)
+        m = _SECRET_RE.search(cmd) or _SECRET_RE.search(normalize_command(cmd))
         if m:
             return (f"Aegis: this command references a credential location ('{m.group(0)}'), which is blocked. "
                     "If the task really needs it, ask the user to allow it explicitly.")
+    # Data-loss prevention: nothing that leaves the machine may carry a credential.
+    outbound = tool == "Bash" or tool.startswith("mcp__") or tool in ("WebFetch", "WebSearch", "Task")
+    if outbound:
+        found = secretscan.find_secrets(json.dumps(args, ensure_ascii=False))
+        if found:
+            return (f"Aegis: this {tool} call contains a credential ({', '.join(found)}); sending secrets to "
+                    "tools, commands or websites is blocked. Use an environment variable or ask the user.")
     return None
 
 

@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import secrets
+import shlex
 import socket
 import sys
 import time
@@ -78,6 +79,21 @@ def run(plan, child):
                 out[c["id"]] = "allow"
             except Exception:
                 out[c["id"]] = "deny"
+        elif op == "unix":
+            try:
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.settimeout(5)
+                s.connect(c["path"])
+                out[c["id"]] = "allow" if b"AEGIS" in s.recv(64) else "deny"
+                s.close()
+            except Exception:
+                out[c["id"]] = "deny"
+        elif op == "exec":
+            try:
+                r = subprocess.run(c["argv"], capture_output=True, timeout=15)
+                out[c["id"]] = "allow" if r.returncode == 0 else "deny"
+            except Exception:
+                out[c["id"]] = "deny"
         elif op == "proxy":
             out[c["id"]] = via_proxy(c["host"], c["port"])
     return out
@@ -127,6 +143,25 @@ class Check:
 
     def to_dict(self) -> dict:
         return dict(self.__dict__)
+
+
+def _host_service(path: Path):
+    """A fake local service on a unix socket that greets every client."""
+    import threading
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(str(path))
+    srv.listen(8)
+
+    def loop() -> None:
+        while True:
+            try:
+                c, _ = srv.accept()
+                c.sendall(b"AEGIS-HOST-SERVICE")
+                c.close()
+            except OSError:
+                return
+    threading.Thread(target=loop, daemon=True).start()
+    return srv, path
 
 
 def _control_connect(host: str, port: int, via_upstream: bool) -> str:
@@ -192,11 +227,21 @@ def build_checks(spec: SandboxSpec, project: Path, ws: Path) -> list[Check]:
     write("write-workspace", ws / f".aegis-probe-{tag}.txt")
     write("write-tmp", spec.tmp / f"probe-{tag}.txt")
 
+    if hasattr(socket, "AF_UNIX") and os.name != "nt":
+        # A local service listening on a unix socket, like Docker, ssh-agent or the desktop keyring.
+        runtime = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+        base = runtime if runtime.is_dir() and os.access(runtime, os.W_OK) else paths.canary_dir()
+        checks.append(Check("host-service-socket", "unix", str(base / f"aegis-{tag}.sock"), "deny"))
+    if sys.platform == "darwin":
+        if "apple-events" not in spec.services:
+            checks.append(Check("macos-apple-events", "exec", "/usr/bin/osascript -e 'return 1'", "deny"))
+        if "clipboard" not in spec.services:
+            checks.append(Check("macos-clipboard", "exec", "/usr/bin/pbpaste", "deny"))
     if spec.network == "all":
         checks.append(Check("net-direct", "connect", "1.1.1.1:443", "allow"))
     else:
         checks.append(Check("net-direct", "connect", "1.1.1.1:443", "deny"))
-    if isinstance(spec.network, list):
+    if isinstance(spec.network, list) and not ({"*", "**"} & set(spec.network)):
         checks.append(Check("net-proxy-blocked", "proxy", "blocked.aegis-probe.example:443", "deny"))
         allowed = next((d for d in spec.network if "*" not in d and d != "localhost"), None)
         if allowed:
@@ -229,6 +274,11 @@ def run_probe(project: Path, profile: Profile, *, phase: str = "task", task: Tas
             item["fingerprint"] = _fingerprint(Path(c.target))
         elif c.op == "write":
             item["path"] = c.target
+        elif c.op == "unix":
+            item["path"] = c.target
+        elif c.op == "exec":
+            item["argv"] = shlex.split(c.target)
+            item["child"] = False
         else:
             host, _, port = c.target.rpartition(":")
             item["host"], item["port"] = host, int(port)
@@ -239,8 +289,17 @@ def run_probe(project: Path, profile: Profile, *, phase: str = "task", task: Tas
 
     from aegis_jail.runner import run_phase
     exceptions: list[str] = []
-    pr = run_phase(backend, spec, "probe", [sys.executable, str(tmp / "probe.py"), str(tmp / "plan.json")],
-                   rd, 120, None, exceptions)
+    servers = [_host_service(Path(c.target)) for c in checks if c.op == "unix"]
+    try:
+        pr = run_phase(backend, spec, "probe", [sys.executable, str(tmp / "probe.py"), str(tmp / "plan.json")],
+                       rd, 120, None, exceptions)
+    finally:
+        for srv, sock_path in servers:
+            srv.close()
+            try:
+                sock_path.unlink()
+            except OSError:
+                pass
     log = Path(pr.log).read_text(encoding="utf-8", errors="replace").strip().splitlines()
     try:
         data = json.loads(log[-1])
@@ -250,7 +309,7 @@ def run_probe(project: Path, profile: Profile, *, phase: str = "task", task: Tas
 
     for c in checks:
         c.observed = res.get(c.id, "missing")
-        c.observed_child = child.get(c.id, "") if c.op in ("read", "write", "connect") else ""
+        c.observed_child = child.get(c.id, "") if c.op in ("read", "write", "connect", "unix") else ""
         if c.op == "write":
             # The host decides: did the file actually appear outside the sandbox?
             for suffix, attr in (("", "observed"), (".child", "observed_child")):

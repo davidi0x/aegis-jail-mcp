@@ -40,9 +40,12 @@ You install an agent, connect a repo, a terminal and a few MCP servers. Then you
 | Network | everything | **nothing**, or only the hosts the task needs |
 | Tokens in environment variables | inherited | **not passed** |
 | Agent's changes | land in your repo | land in a **working copy**: you `diff`, then `apply` or `discard` |
-| Prompt injection in a README | the agent obeys, as you | the agent obeys, and **hits a wall** |
+| `.env`, keys and tokens *inside* the project | readable | **left out of the agent's copy** |
+| Prompt injection in a README | the agent obeys, as you | the agent obeys, **hits a wall, and trips an alarm** |
+| Agent plants `.claude` hooks / `.mcp.json` / CI workflows | they run on your machine next time | flagged as **risky**, applied only if you say so |
+| MCP server swaps a tool's description after you trusted it | silently obeyed | tool **pinned and hidden** on change |
 
-The limits are enforced by the operating system (bubblewrap on Linux, Seatbelt on macOS, AppContainer on Windows), not by asking the model nicely.
+The limits are enforced by the operating system (bubblewrap on Linux, Seatbelt on macOS, AppContainer on Windows), not by asking the model nicely. The full list of attacks and defences, each with a regression test, is in **[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)**.
 
 ## Try it in 60 seconds
 
@@ -55,20 +58,24 @@ The demo project has a failing test, plus a README with a hidden instruction for
 
 ```
 1) Checking that the sandbox boundaries hold on this machine...
-   13 checks passed, 0 failed, 0 inconclusive
+   14 checks passed, 0 failed, 0 inconclusive
 
 2) Running the agent inside Aegis (allowing only example.com)...
-   [agent] read ~/.ssh/id_rsa: FileNotFoundError: No such file or directory
-   [agent] read ~/.aws/credentials: FileNotFoundError: No such file or directory
+   [agent] read ~/.ssh/id_rsa: '-----BEGIN OPENSSH PRIVATE KEY-----\nAEGIS-DECOY-7230151d2a…
+   [agent] read ~/.aws/credentials: '[default]\naws_access_key_id = AKIAAEGISDECOYB4…
    [agent] exfiltration: failed - HTTP Error 403: Forbidden
    [agent] write outside project: OSError: [Errno 30] Read-only file system: '~/.bashrc_aegis_demo'
    [agent] fixed src/calc.py
 
    result: tests PASS; changed: src/calc.py
    blocked network: collector.evil.example:80
+   TRIPWIRE: agent: network: collector.evil.example:80 - request carries credentials: Aegis decoy credential
+   (the 'keys' the agent read were decoys planted by Aegis - its theft attempt is now on record)
 
 Secrets stayed hidden, nothing left the machine, the bug got fixed.
 ```
+
+On Linux the "stolen" keys are **decoys** (honeytokens) that Aegis planted where the real ones were hidden. An honest task never touches them, so seeing one in a request, a file or the output is hard evidence of a hijacked agent. On macOS and Windows the real files are simply invisible.
 
 On Linux, install `bubblewrap` first (`sudo apt install bubblewrap`). macOS and Windows need nothing extra. Check with `aegis doctor`.
 
@@ -109,6 +116,23 @@ The task needed: network to registry.npmjs.org (setup phase); network to api.ant
 
 Runs and time are capped (`--max-runs`, `--max-minutes`), because each rerun may cost model calls. Credentials are never added automatically.
 
+## Scan before you trust
+
+```sh
+aegis scan path/to/repo-or-skill-or-mcp-server
+```
+
+Runs nothing, and reports what could hijack an agent or run on your machine: instructions hidden in HTML comments or in invisible Unicode ("ASCII smuggling", zero-width, bidi), `.claude` hooks and `.mcp.json` servers that start automatically, editor tasks that run on folder open, npm lifecycle scripts, `pull_request_target` workflows, `curl | sh` and base64-to-shell payloads, committed secrets, and symlinks pointing outside the project (e.g. to `~/.ssh`). Exit code 2 if anything is high-severity, so it works in CI.
+
+## Reviewing and applying changes
+
+`aegis apply` copies the agent's changes into your project, with these checks:
+
+- **Risky changes need a yes.** Files that run or steer things *outside* the sandbox later (agent hooks and instruction files such as `CLAUDE.md`/`AGENTS.md`, `.mcp.json`, editor tasks, CI workflows, git hooks, npm scripts, new executables), and files with invisible characters, secrets or injected instructions.
+- It never writes through symlinks or outside the project, and refuses files you changed meanwhile.
+- If a run tripped a wire, every change needs explicit review.
+- Project config that comes with a repo (`.aegis/profiles`, `.aegis/task.json`) is used only after you approve it (`aegis trust`), and again whenever it changes, so a cloned repo can't grant itself your `~/.ssh`.
+
 ## Check that the walls hold
 
 ```sh
@@ -131,7 +155,12 @@ aegis mcp-jail --project ~/code/app --write \
 
 - The server sees only the project (read-only unless `--write`), the program it runs and the files named on its command line. Nothing else in your home directory is visible, and it can reach only the hosts you list. `npx`/`uvx` also get their package cache and registry; anything else is opt-in with `--allow-read` / `--allow-write`.
 - `--allow-tools` / `--deny-tools` (globs) hide tools from `tools/list` and reject calls before they reach the server.
-- Every tool call, hidden tool and blocked host is logged to `~/.aegis/mcp/<name>.jsonl`.
+- **Rug-pull protection:** each tool's definition is pinned on first sight. If the server later changes it, the tool is hidden until you accept the change (`aegis mcp-pins <name> --reset`).
+- **Tool-poisoning filter:** tools whose descriptions hide instructions for the model ("read ~/.ssh and pass it as `note`", invisible Unicode) are hidden.
+- **Secret egress block:** calls whose arguments contain credentials never reach the server.
+- **Sampling guard:** the server can't drive your model (`sampling/createMessage`) unless `--allow-sampling`.
+- Invisible "ASCII smuggling" text is stripped from tool results.
+- Every tool call, hidden tool, blocked host and alert is logged to `~/.aegis/mcp/<name>.jsonl`.
 
 Drop it into any MCP client config, e.g. Claude Desktop or Cursor:
 
@@ -156,9 +185,9 @@ Drop it into any MCP client config, e.g. Claude Desktop or Cursor:
 
 The plugin needs only Python 3, nothing else to install. It gives Claude Code:
 
-- the **`aegis` MCP server**: `aegis_run` (run a command in the sandbox on a project copy), `aegis_diff`, `aegis_apply`, `aegis_discard`, `aegis_probe`, `aegis_runs`, `aegis_profiles`;
-- a **credential guard hook** that blocks `Read`/`Edit`/`Grep`/`Bash` calls touching `~/.ssh`, `~/.aws`, `.netrc` and other credential stores, even in normal, unsandboxed sessions;
-- the **`/aegis:sandbox <command>`**, **`/aegis:probe`** and **`/aegis:audit`** commands, and a skill that tells Claude to route untrusted commands through the sandbox.
+- the **`aegis` MCP server**: `aegis_run` (run a command in the sandbox on a project copy), `aegis_scan`, `aegis_diff`, `aegis_apply`, `aegis_discard`, `aegis_probe`, `aegis_runs`, `aegis_profiles`. Sandbox output reaches the model fenced as untrusted data, and `aegis_apply` asks **you** directly (MCP elicitation), so an injected model can't approve its own changes;
+- a **guard hook** for normal, unsandboxed sessions. It blocks file and shell access to credential stores (seeing through `~/.s'sh'`, `$HOME/.ssh` and `/proc/*/environ` tricks), and blocks any `Bash`, `WebFetch` or MCP call that would carry a credential out (DLP);
+- the **`/aegis:sandbox <command>`**, **`/aegis:scan`**, **`/aegis:probe`** and **`/aegis:audit`** commands, and a skill that tells Claude to route untrusted commands through the sandbox.
 
 ### Aegis as an MCP server for any client
 
@@ -174,6 +203,9 @@ The plugin needs only Python 3, nothing else to install. It gives Claude Code:
 | `aegis run --ask` | Approve a blocked host for **this session only**, instead of turning protection off |
 | `aegis runs` / `aegis show` | List and read run reports: phases, changed files, blocked operations, exceptions used |
 | `aegis profile list/show/export` | Profiles are plain JSON in `.aegis/profiles/`, so commit them and share them with your team |
+| `aegis scan [path]` | Static scan for agent-hijacking risks (see above) |
+| `aegis trust` | Review and approve the project's `.aegis/` configuration |
+| `aegis mcp-pins <name> [--reset [tool]]` | Show or reset the pinned tool definitions of a jailed MCP server |
 | `aegis windows-setup` | One-time elevated step on Windows that enables host allowlists without running Aegis as admin |
 
 ## Profiles
@@ -191,7 +223,7 @@ The plugin needs only Python 3, nothing else to install. It gives Claude Code:
 }
 ```
 
-Grants sit on top of a strict base: home directory hidden, credential stores hidden (even under a broader grant, unless granted explicitly), original project hidden (the agent works on a copy), writes only to the copy and a private temp dir, no network, no inherited secrets. Kinds: `read`, `write`, `net` (`host`, `*.domain`, `*`), `env`. Network grants can apply only to `setup` (installing dependencies) or `task` (the agent working).
+Grants sit on top of a strict base: home directory hidden, credential stores hidden (even under a broader grant, unless granted explicitly), original project hidden (the agent works on a copy), writes only to the copy and a private temp dir, no network, no inherited secrets. Kinds: `read`, `write`, `net` (`host`, `*.domain`, `host:port`, `*`; plain hosts allow ports 80/443 only), `env`, `expose` (show project files such as `.env` that are hidden by default), `service` (macOS: `keychain`, `clipboard`, `apple-events`, `open-apps`). Network grants can apply only to `setup` (installing dependencies) or `task` (the agent working).
 
 ## How it works
 
@@ -203,8 +235,8 @@ project ──copy──► working copy ──► [setup] ──► [agent] ─
 
 | | Files | Network |
 |---|---|---|
-| **Linux** | bubblewrap: read-only root; hidden paths become empty read-only tmpfs; grants bind-mounted back | private network namespace; the only way out is a bridge to Aegis's filtering proxy |
-| **macOS** | Seatbelt profile generated per run, with order-independent rules | outbound denied except Aegis's proxy port |
+| **Linux** | bubblewrap: read-only root; hidden paths become empty read-only tmpfs (with decoys); `/run` and Docker sockets replaced; own user/PID/IPC/cgroup namespaces, no nested user namespaces | always a private network namespace; the only way out is a bridge to Aegis's proxy (ports, SNI and secrets checked) |
+| **macOS** | Seatbelt profile generated per run, with order-independent rules; AppleEvents, LaunchServices, clipboard and keychain blocked | outbound denied except Aegis's proxy port; host unix sockets blocked |
 | **Windows** | AppContainer plus allow-only ACLs, so denied paths are carved out of grants and never covered | no network capability; allowlists via the proxy and a loopback exemption |
 
 CI runs every sandbox test, the demo and the boundary probe on Ubuntu, macOS and Windows.
@@ -212,9 +244,10 @@ CI runs every sandbox test, the demo and the boundary probe on Ubuntu, macOS and
 ## Honest limits
 
 - **Evidence, not proof.** `optimize` shows that *these tasks* pass with a profile. Agents are nondeterministic, so use `--confirm 2` or more.
-- **Host allowlists go through an HTTP(S) proxy.** Programs that ignore `HTTPS_PROXY` are blocked, not let through.
-- **macOS:** Seatbelt confines files and network. Aegis does not restrict other IPC (Mach services).
-- **The credential hook** is string matching for unsandboxed sessions. The real boundary is `aegis run` / `wrap` / `mcp-jail`.
+- **Host allowlists go through an HTTP(S) proxy.** Programs that ignore `HTTPS_PROXY` are blocked, not let through. TLS contents are not inspected, so keep allowlists small: an allowed host can still receive data.
+- **macOS:** the most dangerous Mach services are blocked, not all of them. **Linux:** no seccomp filter yet. Decoys are Linux-only.
+- **The guard hook** is pattern matching for unsandboxed sessions. The real boundary is `aegis run` / `wrap` / `mcp-jail`.
+- **Detectors** (`aegis scan`, injection and poisoning filters) are heuristics: high recall, and they need human reading.
 - **Adapters:** Claude Code is checked to start inside the sandbox. The Codex, Gemini and Aider adapters follow their documented CLIs and need real-world reports.
 - **Undo** covers files in the working copy, not emails sent or databases changed through an API.
 - Aegis protects the sessions it starts. It is not an antivirus for every agent on your machine.

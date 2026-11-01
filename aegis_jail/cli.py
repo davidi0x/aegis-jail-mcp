@@ -8,7 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from aegis_jail import __version__, paths, workspace
+from aegis_jail import __version__, paths, trust, workspace
 from aegis_jail.agents import Task, get_agent
 from aegis_jail.policy import Grant, Profile, baseline_profile
 
@@ -34,11 +34,24 @@ def _load_profile(project: Path, name: str, agent: str | None) -> Profile:
             # Zero-config: the strict base profile (no extra access at all).
             return Profile(name="default", agent=agent or "claude-code", grants=[])
         raise SystemExit(f"aegis: profile not found: {path} (see `aegis profile list`)")
-    return Profile.load(path)
+    prof = Profile.load(path)
+    if prof.grants and _in_project(project, path):
+        trust.ensure(path)
+    return prof
+
+
+def _in_project(project: Path, path: Path) -> bool:
+    try:
+        path.resolve().relative_to(project.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def _load_task(project: Path, args) -> Task:
     tf = Path(args.task_file) if getattr(args, "task_file", None) else paths.project_config_dir(project) / "task.json"
+    if tf.exists() and _in_project(project, tf):
+        trust.ensure(tf)
     task = Task.load(tf) if tf.exists() else Task()
     if getattr(args, "agent", None):
         task.agent = args.agent
@@ -73,10 +86,12 @@ def cmd_init(args) -> int:
               note="internet while installing dependencies"),
     ])
     starter.save(prof_path)
+    trust.record(prof_path)
     task_path = cfg / "task.json"
     if not task_path.exists():
         Task(name="example", agent=args.agent, prompt="Describe a representative task for your agent here",
              verify="", setup="").save(task_path)
+        trust.record(task_path)
     print(f"Created {prof_path.relative_to(project)} and {task_path.relative_to(project)}\n")
     from aegis_jail.report import describe_profile
     print(describe_profile(starter.merged(agent.grants(Task(agent=args.agent)))))
@@ -110,7 +125,7 @@ def cmd_run(args) -> int:
     print()
     print(Path(rep.run_dir, "report.md").read_text(encoding="utf-8"))
     if rep.ok and args.apply and rep.changes:
-        return cmd_apply(argparse.Namespace(project=args.project, run=rep.run_id))
+        return cmd_apply(argparse.Namespace(project=args.project, run=rep.run_id, allow_risky=False))
     return 0 if rep.ok else 2
 
 
@@ -159,6 +174,7 @@ def cmd_optimize(args) -> int:
     res.final.name = args.save
     dest = _profile_path(project, args.save)
     res.final.save(dest)
+    trust.record(dest)
     print(f"Saved verified profile to {dest}")
     print(f"Use it with: aegis run --profile {args.save}")
     return 0
@@ -209,9 +225,27 @@ def cmd_apply(args) -> int:
         print(f"Run {rep.run_id} is already {rep.status}.")
         return 1
     chs = [workspace.Change(**c) for c in rep.changes]
+    allow_risky = getattr(args, "allow_risky", False)
+    risky = [c for c in chs if c.risks]
+    if rep.tripwires:
+        print("aegis: WARNING - this run tripped a wire (the agent handled decoy credentials):")
+        print("\n".join(f"  - {t}" for t in rep.tripwires))
+        risky = chs  # every change from a hostile run deserves review
+    if risky and not allow_risky and sys.stdin.isatty():
+        print("These changes could run code or steer agents outside the sandbox:")
+        for c in risky:
+            print(f"  {c.path}: {'; '.join(c.risks) or 'from a run that tripped a wire'}")
+        allow_risky = input("Apply them anyway? (review `aegis diff` first) [y/N] ").strip().lower() in ("y", "yes", "t", "tak")
+        if not allow_risky:
+            print("Nothing applied.")
+            return 1
+    if rep.tripwires and not allow_risky:
+        print("aegis: not applied - re-run with --allow-risky after reviewing the diff")
+        return 1
     try:
-        applied = workspace.apply(project, ws, workspace.load_baseline(rd / "baseline.json"), chs)
-    except workspace.ApplyConflict as e:
+        applied = workspace.apply(project, ws, workspace.load_baseline(rd / "baseline.json"), chs,
+                                  allow_risky=allow_risky)
+    except (workspace.ApplyConflict, workspace.RiskyChanges) as e:
         print(f"aegis: not applied - {e}")
         return 1
     rep.status = "applied"
@@ -220,6 +254,27 @@ def cmd_apply(args) -> int:
     cleanup_run(rd)
     print(f"Applied {len(applied)} change(s) to {project}")
     return 0
+
+
+def cmd_trust(args) -> int:
+    project = _project(args)
+    files = [Path(f) for f in args.files] or sorted((paths.project_config_dir(project) / "profiles").glob("*.json"))
+    task = paths.project_config_dir(project) / "task.json"
+    if not args.files and task.exists():
+        files.append(task)
+    if not files:
+        print("No project configuration to trust.")
+        return 0
+    for f in files:
+        state = "trusted" if trust.is_trusted(f) else "NOT trusted"
+        print(f"{f} ({state}):\n{trust.summary(f)}\n")
+    if args.yes or (sys.stdin.isatty() and input("Trust all of the above? [y/N] ").strip().lower() in ("y", "yes", "t", "tak")):
+        for f in files:
+            trust.record(f)
+        print(f"Trusted {len(files)} file(s).")
+        return 0
+    print("Nothing changed.")
+    return 1
 
 
 def cmd_discard(args) -> int:
@@ -325,7 +380,41 @@ def cmd_mcp_jail(args) -> int:
     profile = _with_command_grants(profile, argv, args)
     name = args.name or Path(argv[-1]).name.replace("/", "_") or "server"
     fw = mcpjail.ToolFirewall(allow=_split(args.allow_tools), deny=_split(args.deny_tools))
-    return mcpjail.serve(argv, project=project, profile=profile, firewall=fw, name=name, write=args.write)
+    opts = mcpjail.JailOptions(pin=not args.no_pin, allow_poisoned=args.allow_poisoned,
+                               allow_sampling=args.allow_sampling, allow_secrets=args.allow_secrets)
+    return mcpjail.serve(argv, project=project, profile=profile, firewall=fw, name=name, write=args.write,
+                         options=opts)
+
+
+def cmd_mcp_pins(args) -> int:
+    from aegis_jail.mcpjail import Pins
+    pins = Pins(args.name)
+    if args.reset is not None:
+        if args.reset == "ALL":
+            pins.data = {}
+        else:
+            pins.data.pop(args.reset, None)
+        pins._save()
+        print(f"Reset pins for {args.name}: {args.reset}. Changed tools are accepted on the next start.")
+        return 0
+    if not pins.data:
+        print(f"No pinned tools for '{args.name}' yet.")
+    for tool, digest in sorted(pins.data.items()):
+        print(f"{tool:40s} {digest[:16]}")
+    return 0
+
+
+def cmd_scan(args) -> int:
+    from aegis_jail import scan
+    root = Path(args.path).resolve()
+    if not root.exists():
+        raise SystemExit(f"aegis: no such path: {root}")
+    findings = scan.scan(root)
+    if args.json:
+        print(json.dumps([f.to_dict() for f in findings], indent=2))
+    else:
+        print(scan.render(findings, root))
+    return 2 if any(f.severity == "high" for f in findings) else 0
 
 
 def cmd_mcp_server(args) -> int:
@@ -387,6 +476,10 @@ def cmd_demo(args) -> int:
             print("\n".join("   | " + ln for ln in tail))
     if rep.blocked_network:
         print(f"   blocked network: {', '.join(rep.blocked_network)}")
+    for t in rep.tripwires:
+        print(f"   TRIPWIRE: {t}")
+    if rep.tripwires:
+        print("   (the 'keys' the agent read were decoys planted by Aegis - its theft attempt is now on record)")
     print("   your real project is untouched until you run `aegis apply`.\n")
     print(bar)
     print("Secrets stayed hidden, nothing left the machine, the bug got fixed." if ok else
@@ -442,10 +535,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-tools", action="append", help="only expose these tools (globs, comma-separated)")
     p.add_argument("--deny-tools", action="append", help="hide and block these tools (globs, comma-separated)")
     p.add_argument("--pass-env", action="append", help="environment variables to pass (e.g. GITHUB_TOKEN)")
+    p.add_argument("--no-pin", action="store_true", help="do not pin tool definitions (rug-pull protection)")
+    p.add_argument("--allow-poisoned", action="store_true", help="show tools whose descriptions look poisoned")
+    p.add_argument("--allow-sampling", action="store_true", help="let the server request completions from your model")
+    p.add_argument("--allow-secrets", action="store_true", help="let tool arguments carry credentials")
     p.add_argument("--allow-read", action="append", help="extra readable paths (comma-separated)")
     p.add_argument("--allow-write", action="append", help="extra writable paths (comma-separated)")
     p.add_argument("command", nargs=argparse.REMAINDER, help="-- server command [args...]")
     p.set_defaults(fn=cmd_mcp_jail)
+
+    p = sub.add_parser("scan", help="scan a repo / skill / plugin / MCP server for agent-hijacking risks (runs nothing)")
+    p.add_argument("path", nargs="?", default=".")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_scan)
+
+    p = sub.add_parser("mcp-pins", help="show / reset the pinned tool definitions of a jailed MCP server")
+    p.add_argument("name")
+    p.add_argument("--reset", nargs="?", const="ALL", help="forget one tool's pin (or all) to accept a change")
+    p.set_defaults(fn=cmd_mcp_pins)
 
     p = sub.add_parser("mcp-server", help="expose Aegis tools to AI clients over MCP (stdio)")
     p.set_defaults(fn=cmd_mcp_server)
@@ -491,7 +598,15 @@ def build_parser() -> argparse.ArgumentParser:
                           ("discard", cmd_discard, "throw away a run's changes")):
         p = common(sub.add_parser(name, help=hlp))
         p.add_argument("run", nargs="?", default="last")
+        if name == "apply":
+            p.add_argument("--allow-risky", action="store_true",
+                           help="also apply changes flagged as risky (agent configs, hooks, CI, scripts...)")
         p.set_defaults(fn=fn)
+
+    p = common(sub.add_parser("trust", help="review and approve the project's .aegis profiles / task"))
+    p.add_argument("files", nargs="*")
+    p.add_argument("--yes", action="store_true", help="approve without asking")
+    p.set_defaults(fn=cmd_trust)
 
     p = common(sub.add_parser("runs", help="list runs"))
     p.add_argument("--limit", type=int, default=20)
@@ -516,7 +631,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except Exception as e:  # noqa: BLE001 - top-level user-facing error
         from aegis_jail.sandbox import SandboxUnavailable
-        if isinstance(e, (SandboxUnavailable, ValueError)):
+        from aegis_jail.trust import Untrusted
+        from aegis_jail.workspace import ApplyConflict, RiskyChanges
+        if isinstance(e, (SandboxUnavailable, ValueError, Untrusted, ApplyConflict, RiskyChanges)):
             print(f"aegis: {e}", file=sys.stderr)
             return 1
         raise

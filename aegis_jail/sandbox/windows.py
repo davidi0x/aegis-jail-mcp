@@ -21,6 +21,7 @@ non-elevated Aegis uses one shared container prepared once with
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import subprocess
 import sys
@@ -159,6 +160,7 @@ class AppContainerBackend(Backend):
             raise SandboxUnavailable("not Windows")
         if sys.getwindowsversion().build < 9200:
             raise SandboxUnavailable("AppContainer needs Windows 8 / Server 2012 or newer")
+        _recover_stale_acls()
 
     # -- ACL management --------------------------------------------------
     @staticmethod
@@ -184,7 +186,10 @@ class AppContainerBackend(Backend):
 
     def _apply_acls(self, spec: SandboxSpec, sid: str) -> list[Path]:
         touched: list[Path] = []
-        for path, perm, inherit in self.plan_acls(spec.fs_rules):
+        plan = self.plan_acls(spec.fs_rules)
+        # Journal first: if Aegis is killed mid-run, the next start removes these ACEs.
+        _journal(sid).write_text(json.dumps({"sid": sid, "paths": [str(p) for p, _, _ in plan]}), encoding="utf-8")
+        for path, perm, inherit in plan:
             flags = "(OI)(CI)" if inherit and path.is_dir() else ""
             _icacls(str(path), "/grant", f"*{sid}:{flags}({perm})", "/Q")
             touched.append(path)
@@ -250,6 +255,10 @@ class AppContainerBackend(Backend):
             return self._spawn(sid, cap_arr, len(cap_sids), argv, env, spec.cwd, log_path, timeout, stdio)
         finally:
             self._remove_acls(touched, sid_str)
+            try:
+                _journal(sid_str).unlink()
+            except OSError:
+                pass
             if loopback:
                 subprocess.run(["CheckNetIsolation.exe", "LoopbackExempt", "-d", f"-p={sid_str}"],
                                capture_output=True)
@@ -344,6 +353,31 @@ class AppContainerBackend(Backend):
 
 
 SHARED_NET_CONTAINER = "aegis.net.v1"
+
+
+def _journal(sid: str) -> Path:
+    from aegis_jail import paths
+    d = paths.aegis_home() / "acl-journal"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{sid}.json"
+
+
+def _recover_stale_acls() -> None:
+    """Remove ACEs left behind by a run that crashed (journal entries older than a day or orphaned)."""
+    from aegis_jail import paths
+    d = paths.aegis_home() / "acl-journal"
+    if not d.exists():
+        return
+    for j in d.glob("*.json"):
+        try:
+            if time.time() - j.stat().st_mtime < 24 * 3600:
+                continue
+            data = json.loads(j.read_text(encoding="utf-8"))
+            for p in data.get("paths", []):
+                subprocess.run(["icacls", p, "/remove", f"*{data['sid']}", "/Q"], capture_output=True)
+            j.unlink()
+        except (OSError, ValueError, KeyError):
+            continue
 INFINITE = 0xFFFFFFFF
 
 
