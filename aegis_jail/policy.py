@@ -156,9 +156,6 @@ class Profile:
         if home.parent in (Path("/home"), Path("/Users")):
             rules.append(("deny", home.parent))  # other users' files
         rules.append(("deny", home))
-        # Aegis's own runtime (interpreter, package) must stay readable.
-        for rp in runtime_paths or []:
-            rules.append(("read", rp.resolve()))
         granted_paths: list[Path] = []
         for g in self.grants:
             if g.kind in ("read", "write") and g.applies_to(phase):
@@ -180,6 +177,17 @@ class Profile:
                     rules.append(("deny", real))
         rules.append(("deny", project.resolve()))
         rules.append(("deny", paths.aegis_home()))
+        # Aegis's own runtime (interpreter, package) must stay readable. It comes after the denies so
+        # that an interpreter or virtualenv living inside the hidden project is still found, but never
+        # inside a hidden credential store. Paths are used as given (not resolved): a symlinked
+        # interpreter needs each name on its way to exist inside the sandbox.
+        hidden_areas = [project.resolve(), paths.aegis_home()]
+        for rp in runtime_paths or []:
+            if any(_is_within(rp, s) for s in hidden_secrets):
+                continue
+            if any(_is_within(rp, gp) for gp in granted_paths) and not any(_is_within(rp, d) for d in hidden_areas):
+                continue  # already visible through a broader grant; mounting it again can fail on symlinks
+            rules.append(("read", rp))
         rules.append(("write", workspace.resolve()))
         rules.append(("write", tmp.resolve()))
 

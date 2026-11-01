@@ -389,7 +389,7 @@ Tak, możesz używać Aegis w pracy za darmo. AGPL wymaga tylko, żebyś, jeśli
 
 ## Status projektu
 
-**Wersja 0.4, wczesna, ale przetestowana:** ponad 50 testów uruchamia się na prawdziwej piaskownicy na Ubuntu, macOS i Windows w CI. Każdy atak oznaczony jako *tested* w [modelu zagrożeń](docs/THREAT_MODEL.md) ma test regresji.
+**Wersja 0.4, wczesna, ale przetestowana:** ponad 50 testów uruchamia się na prawdziwej piaskownicy na Ubuntu, macOS i Windows, na najstarszym (3.10) i najnowszym (3.13) obsługiwanym Pythonie. CI uruchamia też CodeQL, buduje pakiet, a wszystkie akcje są przypięte do commitów. Każdy atak oznaczony jako *tested* w [modelu zagrożeń](docs/THREAT_MODEL.md) ma test regresji.
 
 **Plan:** aplikacja okienkowa i podpisane instalatory · pośredniczenie w użyciu tokenów bez ich ujawniania · polityki argumentów narzędzi MCP · interaktywne wyjątki plikowe · polityki zespołowe i panel audytu.
 

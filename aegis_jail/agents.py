@@ -242,8 +242,35 @@ def get_agent(name: str) -> Agent:
         raise ValueError(f"unknown agent {name!r}; supported: {', '.join(AGENTS)}") from None
 
 
+def _symlink_chain(p: Path) -> list[Path]:
+    """`p` and every path its symlink chain passes through (absolute, not resolved)."""
+    hops: list[Path] = []
+    cur = Path(os.path.abspath(p))
+    for _ in range(16):
+        hops.append(cur)
+        if not cur.is_symlink():
+            break
+        target = Path(os.readlink(cur))
+        cur = Path(os.path.abspath(target if target.is_absolute() else cur.parent / target))
+    return hops
+
+
 def runtime_paths() -> list[Path]:
-    """Aegis's own interpreter and package, needed inside the sandbox for probes and the network bridge."""
-    out = {Path(__file__).resolve().parent, Path(sys.executable).resolve().parent,
-           Path(sys.prefix).resolve(), Path(sys.base_prefix).resolve()}
-    return sorted(out)
+    """Aegis's own interpreter and package, needed inside the sandbox for probes and the network bridge.
+
+    Each path is listed both as written and fully resolved, and every hop of the interpreter's symlink
+    chain is included. Inside the sandbox the home directory is hidden, so a link such as
+    `venv/bin/python -> ~/.local/share/uv/python/cpython-3.10-linux/bin/python3.10` (where
+    `cpython-3.10-linux` is itself a link to `cpython-3.10.20-linux`) only works if every name on the
+    way exists, not just the final target.
+    """
+    candidates = [Path(__file__).parent, Path(sys.prefix), Path(sys.base_prefix)]
+    candidates += [hop.parent for hop in _symlink_chain(Path(sys.executable))]
+    out: set[Path] = set()
+    for c in candidates:
+        out.add(Path(os.path.abspath(c)))
+        try:
+            out.add(c.resolve())
+        except OSError:
+            pass
+    return sorted(p for p in out if p.exists())

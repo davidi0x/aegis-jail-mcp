@@ -1,8 +1,12 @@
+import os
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 from aegis_jail import paths
+from aegis_jail.agents import _symlink_chain
 from aegis_jail.policy import Grant, Profile, baseline_profile
 from aegis_jail.probe import expected_fs
 
@@ -75,6 +79,40 @@ class PolicyTest(unittest.TestCase):
         ids = {g.id for g in b.grants}
         self.assertIn("home-read", ids)
         self.assertIn("net-task-any", ids)
+
+
+class RuntimePathsTest(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "needs symlinks")
+    def test_symlink_chain_keeps_alias_names(self):
+        """venv/bin/python -> alias/bin/python3.10, where `alias` is itself a link (uv, pyenv, Homebrew...)."""
+        root = Path(tempfile.mkdtemp()).resolve()
+        try:
+            real = root / "cpython-3.10.20" / "bin"
+            real.mkdir(parents=True)
+            (real / "python3.10").write_text("")
+            (root / "cpython-3.10").symlink_to(root / "cpython-3.10.20")
+            (root / "venv" / "bin").mkdir(parents=True)
+            link = root / "venv" / "bin" / "python"
+            link.symlink_to(root / "cpython-3.10" / "bin" / "python3.10")
+            parents = {hop.parent for hop in _symlink_chain(link)}
+            self.assertIn(root / "cpython-3.10" / "bin", parents)  # the alias name, not only the final target
+            self.assertIn(root / "venv" / "bin", parents)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_runtime_path_not_remounted_inside_a_broad_grant(self):
+        isolated_aegis_home()
+        home = paths.user_home()
+        rp = home / ".local" / "py" / "bin"
+
+        def rules(grants):
+            spec = Profile("t", "command", grants).compile(
+                "task", project=home / "proj", workspace=paths.aegis_home() / "ws",
+                tmp=paths.aegis_home() / "tmp", runtime_paths=[rp], host_env={})
+            return spec.fs_rules
+
+        self.assertNotIn(("read", rp), rules([Grant(id="h", kind="read", path="~")]))
+        self.assertIn(("read", rp), rules([]))
 
 
 if __name__ == "__main__":

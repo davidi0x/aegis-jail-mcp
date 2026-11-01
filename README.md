@@ -424,7 +424,7 @@ Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it a
 
 ## Project status
 
-**Version 0.4, early but tested:** 50+ tests run against the real sandbox on Ubuntu, macOS and Windows in CI. Every attack marked *tested* in the [threat model](docs/THREAT_MODEL.md) has a regression test.
+**Version 0.4, early but tested:** 50+ tests run against the real sandbox on Ubuntu, macOS and Windows, on the oldest (3.10) and newest (3.13) supported Python. CI also runs CodeQL, builds the wheel, and all actions are pinned to commits. Every attack marked *tested* in the [threat model](docs/THREAT_MODEL.md) has a regression test.
 
 **Roadmap:** desktop app and signed installers · secret brokering (use a token without exposing it) · per-tool argument policies for MCP · interactive file exceptions · team policies and an audit dashboard.
 

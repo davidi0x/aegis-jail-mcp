@@ -1,0 +1,46 @@
+name: Release
+
+# Push a tag such as v0.4.1 (it must match aegis_jail.__version__). The workflow builds the package, signs a
+# provenance attestation and creates a DRAFT GitHub release, so you read the notes and press "Publish".
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write        # create the release
+      id-token: write        # sign the attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: The tag matches the package version
+        run: |
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, ".")
+          from aegis_jail import __version__
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          if tag != __version__:
+              sys.exit(f"tag v{tag} does not match aegis_jail.__version__ {__version__}")
+          PY
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --title "Aegis Jail MCP $GITHUB_REF_NAME" --generate-notes --verify-tag --draft
