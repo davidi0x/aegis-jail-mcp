@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install Hydra (macOS / Linux). Usage: curl -fsSL <raw-url>/scripts/install.sh | sh
 set -e
-REPO="${HYDRA_REPO:-https://github.com/IwanskyDD/Hydra}"
+REPO="${HYDRA_REPO:-https://github.com/IwanskyDD/aegis-mcp-jail}"
 REF="${HYDRA_REF:-main}"
 PY="$(command -v python3 || true)"
 [ -n "$PY" ] || { echo "Hydra needs Python 3.10+ (python3 not found)"; exit 1; }

@@ -16,7 +16,7 @@ access to ~/.aws (credentials); internet after dependency installation.
 Saved verified profile to .hydra/profiles/verified.json
 ```
 
-Status: **wersja 0.1, wczesna**. Działa na Linuksie (bubblewrap) i macOS (Seatbelt). Backend Windows (AppContainer) jest zaimplementowany i testowany w CI; traktuj go jako eksperymentalny. Pełny koncept produktu: [docs/KONCEPCJA.md](docs/KONCEPCJA.md).
+Status: **wersja 0.1, wczesna**. Działa na Linuksie (bubblewrap) i macOS (Seatbelt). Backend Windows (AppContainer) przechodzi te same testy w CI, ale nie był jeszcze sprawdzany z prawdziwymi agentami — traktuj go jako eksperymentalny. Pełny koncept produktu: [docs/KONCEPCJA.md](docs/KONCEPCJA.md).
 
 ## Co jest w tej wersji
 
@@ -40,7 +40,7 @@ Wymagany jest Python 3.10+. Hydra nie ma zależności poza biblioteką standardo
 **macOS / Linux**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/IwanskyDD/Hydra/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/IwanskyDD/aegis-mcp-jail/main/scripts/install.sh | sh
 ```
 
 Na Linuksie potrzebny jest też `bubblewrap` (`sudo apt install bubblewrap`).
@@ -48,13 +48,13 @@ Na Linuksie potrzebny jest też `bubblewrap` (`sudo apt install bubblewrap`).
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/IwanskyDD/Hydra/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/IwanskyDD/aegis-mcp-jail/main/scripts/install.ps1 | iex
 ```
 
 **Z kodu**
 
 ```sh
-git clone https://github.com/IwanskyDD/Hydra && cd Hydra && python3 -m pip install .
+git clone https://github.com/IwanskyDD/aegis-mcp-jail && cd aegis-mcp-jail && python3 -m pip install .
 ```
 
 Sprawdź, czy sandbox działa na Twoim komputerze:
