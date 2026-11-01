@@ -129,7 +129,7 @@ aegis mcp-jail --project ~/code/app --write \
   -- npx -y @modelcontextprotocol/server-github
 ```
 
-- The server sees only the project (read-only unless `--write`), nothing else in your home directory, and only the hosts you list.
+- The server sees only the project (read-only unless `--write`), the program it runs and the files named on its command line. Nothing else in your home directory is visible, and it can reach only the hosts you list. `npx`/`uvx` also get their package cache and registry; anything else is opt-in with `--allow-read` / `--allow-write`.
 - `--allow-tools` / `--deny-tools` (globs) hide tools from `tools/list` and reject calls before they reach the server.
 - Every tool call, hidden tool and blocked host is logged to `~/.aegis/mcp/<name>.jsonl`.
 

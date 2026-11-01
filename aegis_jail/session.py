@@ -73,6 +73,54 @@ class Session:
             shutil.rmtree(self.tmp, ignore_errors=True)
 
 
+RUNNERS = {
+    # program -> (writable cache dirs, registry hosts)
+    "npx": (["~/.npm"], ["registry.npmjs.org"]),
+    "npm": (["~/.npm"], ["registry.npmjs.org"]),
+    "pnpm": (["~/.local/share/pnpm", "~/.cache/pnpm"], ["registry.npmjs.org"]),
+    "bunx": (["~/.bun"], ["registry.npmjs.org"]),
+    "uvx": (["~/.cache/uv", "~/.local/share/uv"], ["pypi.org", "files.pythonhosted.org"]),
+    "uv": (["~/.cache/uv", "~/.local/share/uv"], ["pypi.org", "files.pythonhosted.org"]),
+}
+
+
+def command_grants(argv: list[str], cwd: Path | None = None) -> tuple[list, list[str]]:
+    """Grants a command needs just to start: its program, files named on the command line,
+    and the package cache + registry of npx/uvx-style runners. Returns (grants, notes)."""
+    import shutil as _sh
+    from aegis_jail.agents import _install_grants, _resolve
+    from aegis_jail.policy import Grant
+    cwd = cwd or Path.cwd()
+    grants: list = []
+    notes: list[str] = []
+    prog = _resolve(argv[0])
+    grants += _install_grants(prog, "program")
+    node = _sh.which("node")
+    if node:
+        grants += _install_grants(os.path.realpath(node), "node")
+    for i, a in enumerate(argv[1:]):
+        if a.startswith("-") or len(a) > 4096:
+            continue
+        p = Path(a).expanduser()
+        p = p if p.is_absolute() else cwd / p
+        try:
+            if p.exists():
+                grants.append(Grant(id=f"arg-{i}", kind="read", path=str(p.resolve()), locked=True,
+                                    note="named on the command line"))
+        except OSError:
+            continue
+    name = Path(argv[0]).name.lower().removesuffix(".cmd").removesuffix(".exe")
+    if name in RUNNERS:
+        dirs, hosts = RUNNERS[name]
+        for j, d in enumerate(dirs):
+            Path(os.path.expanduser(d)).mkdir(parents=True, exist_ok=True)
+            grants.append(Grant(id=f"{name}-cache-{j}", kind="write", path=d, locked=True, note=f"{name} cache"))
+        grants.append(Grant(id=f"{name}-registry", kind="net", domains=hosts, phase="all", locked=True,
+                            note=f"{name} package registry"))
+        notes.append(f"{name}: allowing its cache ({', '.join(dirs)}) and registry ({', '.join(hosts)})")
+    return grants, notes
+
+
 def resolve_argv(argv: list[str]) -> list[str]:
     """Resolve the program to an absolute real path (symlinks in hidden dirs would not work)."""
     from aegis_jail.agents import _resolve

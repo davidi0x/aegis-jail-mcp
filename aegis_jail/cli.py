@@ -270,6 +270,7 @@ def cmd_wrap(args) -> int:
     argv = _strip_dashdash(args.command)
     if not argv:
         raise SystemExit("aegis: give the command to run after --, e.g. aegis wrap -- npm test")
+    profile = _with_command_grants(profile, argv, args)
     sess = Session(project=project, profile=profile, write=args.write,
                    ask=_ask() if args.ask else None)
     spec = sess.prepare()
@@ -280,6 +281,16 @@ def cmd_wrap(args) -> int:
     if blocked:
         print(f"[aegis] blocked network access to: {', '.join(blocked)}", file=sys.stderr)
     return res.exit_code
+
+
+def _with_command_grants(profile, argv, args):
+    from aegis_jail.session import command_grants
+    grants, notes = command_grants(argv)
+    for n in notes:
+        print(f"[aegis] {n}", file=sys.stderr)
+    extra = [Grant(id=f"cli-read-{i}", kind="read", path=p) for i, p in enumerate(_split(args.allow_read))]
+    extra += [Grant(id=f"cli-write-{i}", kind="write", path=p) for i, p in enumerate(_split(args.allow_write))]
+    return profile.merged(grants + extra)
 
 
 def _ask():
@@ -311,6 +322,7 @@ def cmd_mcp_jail(args) -> int:
     argv = _strip_dashdash(args.command)
     if not argv:
         raise SystemExit("aegis: give the MCP server command after --, e.g. aegis mcp-jail -- npx some-mcp-server")
+    profile = _with_command_grants(profile, argv, args)
     name = args.name or Path(argv[-1]).name.replace("/", "_") or "server"
     fw = mcpjail.ToolFirewall(allow=_split(args.allow_tools), deny=_split(args.deny_tools))
     return mcpjail.serve(argv, project=project, profile=profile, firewall=fw, name=name, write=args.write)
@@ -412,6 +424,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--profile", default="default")
     p.add_argument("--write", action="store_true", help="let the command write to the project directory")
     p.add_argument("--ask", action="store_true", help="ask before blocking a network host")
+    p.add_argument("--allow-read", action="append", help="extra readable paths (comma-separated)")
+    p.add_argument("--allow-write", action="append", help="extra writable paths (comma-separated)")
     p.add_argument("command", nargs=argparse.REMAINDER, help="-- command [args...]")
     p.set_defaults(fn=cmd_wrap)
 
@@ -423,6 +437,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-tools", action="append", help="only expose these tools (globs, comma-separated)")
     p.add_argument("--deny-tools", action="append", help="hide and block these tools (globs, comma-separated)")
     p.add_argument("--pass-env", action="append", help="environment variables to pass (e.g. GITHUB_TOKEN)")
+    p.add_argument("--allow-read", action="append", help="extra readable paths (comma-separated)")
+    p.add_argument("--allow-write", action="append", help="extra writable paths (comma-separated)")
     p.add_argument("command", nargs=argparse.REMAINDER, help="-- server command [args...]")
     p.set_defaults(fn=cmd_mcp_jail)
 
