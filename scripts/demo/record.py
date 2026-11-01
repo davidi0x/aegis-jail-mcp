@@ -7,6 +7,7 @@ Usage: record.py OUT.json   (expects `aegis` on PATH and the project in ~/shop)
 import json, os, re, pty, select, shutil, subprocess, sys, time, random
 
 ROWS, COLS = 40, 104
+SCEN = None
 HOME = os.path.expanduser("~")
 SHOP = os.path.join(HOME, "shop")
 SCRIPT = [  # (command, pause after, wait for prompt seconds max)
@@ -22,6 +23,9 @@ SCRIPT = [  # (command, pause after, wait for prompt seconds max)
 
 
 def fresh():
+    if SCEN:
+        subprocess.run(SCEN["setup"], shell=True, check=True)
+        return
     shutil.rmtree(SHOP, ignore_errors=True)
     os.makedirs(SHOP)
     open(f"{SHOP}/app.py", "w").write("def total(prices):\n    return sum(prices) + 1\n")
@@ -33,11 +37,15 @@ def fresh():
 
 
 def main(out):
+    global SHOP, ROWS, COLS, SCRIPT
+    if SCEN:
+        SHOP, ROWS, COLS = os.path.expanduser(SCEN["cwd"]), SCEN.get("rows", ROWS), SCEN.get("cols", COLS)
+        SCRIPT = [tuple(x) for x in SCEN["steps"]]
     fresh()
     pid, fd = pty.fork()
     if pid == 0:
         os.chdir(SHOP)
-        os.environ.update(TERM="xterm-256color", PS1="\\[\\e[1;32m\\]~/shop\\[\\e[0m\\] \\$ ", COLUMNS=str(COLS), LINES=str(ROWS))
+        os.environ.update(TERM="xterm-256color", PS1=(SCEN or {}).get("ps1", "\\[\\e[1;32m\\]~/shop\\[\\e[0m\\] \\$ "), COLUMNS=str(COLS), LINES=str(ROWS))
         os.execvp("bash", ["bash", "--norc", "--noprofile"])
     import fcntl, struct, termios
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
@@ -64,17 +72,22 @@ def main(out):
 
     pump(0.8)
     for cmd, pause in SCRIPT:
-        for ch in cmd:
-            os.write(fd, ch.encode())
-            pump(random.uniform(0.025, 0.06))
-        pump(0.35)
+        if cmd.startswith("__UP__"):  # recall the previous command from shell history, like a person would
+            pump(1.2)
+            for _ in range(int(cmd[6:] or 1)):
+                os.write(fd, b"\x1b[A"); pump(0.5)
+        else:
+            for ch in cmd:
+                os.write(fd, ch.encode())
+                pump(random.uniform(0.025, 0.06))
+        pump(0.5 if cmd.startswith("__UP__") else 0.35)
         os.write(fd, b"\r")
         if cmd == "aegis apply":  # real confirmation prompt: let the viewer read the warning, then answer
             pump(4.5)
             for ch in "y":
                 os.write(fd, ch.encode()); pump(0.3)
             os.write(fd, b"\r")
-        sys.stderr.write(f"cmd: {cmd[:30]} t={time.time()-t0:.1f}\n"); wait_prompt(25)
+        sys.stderr.write(f"cmd: {cmd[:30]} t={time.time()-t0:.1f}\n"); wait_prompt(150)
         pump(pause)
     os.write(fd, b"exit\r")
     pump(0.3)
@@ -82,4 +95,6 @@ def main(out):
     print("recorded", len(ev), "chunks,", round(ev[-1][0], 1), "s")
 
 
+if len(sys.argv) > 2:
+    SCEN = json.load(open(sys.argv[2]))
 main(sys.argv[1])

@@ -1,0 +1,33 @@
+{
+ "cwd": "~/weather-demo",
+ "rows": 34,
+ "cols": 112,
+ "ps1": "\\[\\e[1;32m\\]~/weather-demo\\[\\e[0m\\] \\$ ",
+ "setup": "cd ~/weather-demo && rm -f updated ~/.aegis/mcp/weather.jsonl ~/.aegis/mcp/weather.pins.json",
+ "steps": [
+  [
+   "cat .mcp.json",
+   2.5
+  ],
+  [
+   "claude -p \"What is the weather in Paris? Use the weather tool.\" --mcp-config .mcp.json --strict-mcp-config --allowedTools mcp__weather__get_weather < /dev/null",
+   3.0
+  ],
+  [
+   "touch updated   # the server author ships an update",
+   2.5
+  ],
+  [
+   "echo '{\"id\":1,\"method\":\"tools/list\"}' | python3 weather_server.py | jq -r '.result.tools[0].description'",
+   4.5
+  ],
+  [
+   "__UP__3",
+   3.0
+  ],
+  [
+   "grep tool_hidden ~/.aegis/mcp/weather.jsonl",
+   4.0
+  ]
+ ]
+}
