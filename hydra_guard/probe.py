@@ -97,13 +97,11 @@ print(json.dumps(res))
 
 def expected_fs(rules: list[tuple[str, Path]], path: Path, op: str) -> str:
     """Evaluate SandboxSpec fs_rules (last match wins) for a path."""
+    from hydra_guard.policy import _is_within
     action = None
     for a, p in rules:
-        try:
-            path.relative_to(p)
+        if _is_within(path, p):
             action = a
-        except ValueError:
-            continue
     if op == "read":
         return "deny" if action == "deny" else "allow"
     return "allow" if action == "write" else "deny"
@@ -174,9 +172,10 @@ def build_checks(spec: SandboxSpec, project: Path, ws: Path) -> list[Check]:
     snap = workspace.snapshot(project)
     if snap:
         read("read-original-project", project / sorted(snap)[0])
-    skip = {".hydra"} | {Path(s).parts[1] for s in paths.SECRET_PATHS if s.startswith("~/")}
+    skip = {".hydra"} | {Path(s).parts[1].lower() for s in paths.SECRET_PATHS if s.startswith("~/")}
+    skip |= {paths.hydra_home().name.lower()}
     for entry in sorted(home.iterdir()) if home.exists() else []:
-        if entry.name not in skip and not entry.is_symlink():
+        if entry.name.lower() not in skip and not entry.name.startswith(".hydra") and not entry.is_symlink():
             try:
                 _fingerprint(entry)
             except OSError:

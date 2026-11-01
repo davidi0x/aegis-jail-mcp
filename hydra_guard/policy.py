@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -170,9 +171,18 @@ class Profile:
         return SandboxSpec(fs_rules=rules, network=network, env=env, cwd=workspace.resolve(), tmp=tmp.resolve())
 
 
+# macOS and Windows file systems are case-insensitive by default; the
+# sandboxes there match paths case-insensitively too.
+CASE_INSENSITIVE = sys.platform in ("darwin", "win32")
+
+
+def _norm(p: Path) -> Path:
+    return Path(str(p).lower()) if CASE_INSENSITIVE else p
+
+
 def _is_within(child: Path, parent: Path) -> bool:
     try:
-        child.relative_to(parent)
+        _norm(child).relative_to(_norm(parent))
         return True
     except ValueError:
         return False
