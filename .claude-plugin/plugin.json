@@ -1,0 +1,10 @@
+{
+  "name": "aegis",
+  "version": "0.2.0",
+  "description": "Least-privilege sandbox for AI agents: run commands and MCP servers without access to your home directory, credentials or the network, review diffs before applying, and block credential reads in Claude Code.",
+  "author": { "name": "IwanskyDD" },
+  "homepage": "https://github.com/IwanskyDD/aegis-mcp-jail",
+  "repository": "https://github.com/IwanskyDD/aegis-mcp-jail",
+  "license": "MIT",
+  "keywords": ["security", "sandbox", "mcp", "least-privilege", "prompt-injection", "secrets"]
+}

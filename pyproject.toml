@@ -1,13 +1,15 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hydra-guard"
+name = "aegis-mcp-jail"
 dynamic = ["version"]
-description = "Run AI coding agents with a verified, minimal set of permissions (files, network, secrets)."
+description = "Least-privilege sandbox for AI agents and MCP servers: no home dir, no credentials, no network unless verified as needed."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+keywords = ["ai", "agents", "mcp", "sandbox", "security", "least-privilege", "claude-code", "prompt-injection"]
 dependencies = []
 classifiers = [
   "Operating System :: MacOS",
@@ -17,11 +19,18 @@ classifiers = [
 ]
 
 [project.scripts]
-hydra = "hydra_guard.cli:main"
-hydra-guard = "hydra_guard.cli:main"
+aegis = "aegis_jail.cli:main"
+aegis-mcp-jail = "aegis_jail.cli:main"
 
 [tool.setuptools.dynamic]
-version = {attr = "hydra_guard.__version__"}
+version = {attr = "aegis_jail.__version__"}
+
+[project.urls]
+Homepage = "https://github.com/IwanskyDD/aegis-mcp-jail"
+Issues = "https://github.com/IwanskyDD/aegis-mcp-jail/issues"
 
 [tool.setuptools.packages.find]
-include = ["hydra_guard*"]
+include = ["aegis_jail*"]
+
+[tool.setuptools.package-data]
+aegis_jail = ["demo/*", "demo/*/*", "demo/.aegis/*", "demo/.aegis/*/*"]

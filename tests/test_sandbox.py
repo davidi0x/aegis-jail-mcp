@@ -4,28 +4,28 @@ import shutil
 import unittest
 from pathlib import Path
 
-from hydra_guard import paths
-from hydra_guard.optimize import optimize
-from hydra_guard.policy import Grant, Profile, baseline_profile
-from hydra_guard.probe import run_probe
-from hydra_guard.runner import run_task
+from aegis_jail import paths
+from aegis_jail.optimize import optimize
+from aegis_jail.policy import Grant, Profile, baseline_profile
+from aegis_jail.probe import run_probe
+from aegis_jail.runner import run_task
 
-from tests.helpers import backend_or_skip, cleanup_hydra_home, demo_copy, demo_task, isolated_hydra_home
+from tests.helpers import backend_or_skip, cleanup_aegis_home, demo_copy, demo_task, isolated_aegis_home
 
 
 def tearDownModule():
-    cleanup_hydra_home()
+    cleanup_aegis_home()
 
 
 class SandboxTest(unittest.TestCase):
     def setUp(self):
-        isolated_hydra_home()
+        isolated_aegis_home()
         self.backend = backend_or_skip(self)
         self.project = demo_copy()
 
     def tearDown(self):
         shutil.rmtree(self.project.parent, ignore_errors=True)
-        leftover = paths.user_home() / ".bashrc_hydra_demo"
+        leftover = paths.user_home() / ".bashrc_aegis_demo"
         self.assertFalse(leftover.exists(), "agent managed to write into the home directory")
 
     def test_demo_task_passes_and_secrets_stay_hidden(self):
@@ -37,7 +37,7 @@ class SandboxTest(unittest.TestCase):
         self.assertNotIn(canary.strip(), log)
         self.assertNotIn("exfiltration: SENT", log)
         self.assertEqual([c["path"] for c in rep.changes], ["src/calc.py"])
-        # The real project is untouched until `hydra apply`.
+        # The real project is untouched until `aegis apply`.
         self.assertIn("a - b", (self.project / "src" / "calc.py").read_text())
 
     def test_allowlist_blocks_and_logs_other_hosts(self):
@@ -76,3 +76,46 @@ class SandboxTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LearnTest(unittest.TestCase):
+    """optimize learns exactly the host a task needs, starting from no network."""
+
+    def test_learns_needed_host(self):
+        import http.server
+        import socketserver
+        import threading
+        from aegis_jail.agents import Task
+
+        isolated_aegis_home()
+        backend = backend_or_skip(self)
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, *a):
+                pass
+
+        srv = socketserver.TCPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        project = demo_copy()
+        try:
+            agent = project / "tools" / "needs_net.py"
+            agent.write_text(
+                "import os, urllib.request\n"
+                "for k in ('NO_PROXY', 'no_proxy'): os.environ.pop(k, None)\n"
+                f"body = urllib.request.urlopen('http://127.0.0.1:{srv.server_address[1]}/', timeout=10).read()\n"
+                "assert body == b'ok', body\n")
+            task = Task(name="net", agent="command", command=["{python}", "tools/needs_net.py"], timeout=60)
+            res = optimize(project, Profile("default", "command"), task, max_runs=8, confirm=1, backend=backend,
+                           escalate=[], log=lambda _: None)
+            self.assertFalse(res.baseline_failed, [t.to_dict() for t in res.trials])
+            self.assertEqual([g.id for g in res.added], ["net-task:127.0.0.1"])
+            self.assertIn("net-task:127.0.0.1", [g.id for g in res.final.grants])
+        finally:
+            srv.shutdown()
+            srv.server_close()
+            shutil.rmtree(project.parent, ignore_errors=True)

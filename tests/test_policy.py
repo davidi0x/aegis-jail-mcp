@@ -1,23 +1,23 @@
 import unittest
 from pathlib import Path
 
-from hydra_guard import paths
-from hydra_guard.policy import Grant, Profile, baseline_profile
-from hydra_guard.probe import expected_fs
+from aegis_jail import paths
+from aegis_jail.policy import Grant, Profile, baseline_profile
+from aegis_jail.probe import expected_fs
 
-from tests.helpers import isolated_hydra_home
+from tests.helpers import isolated_aegis_home
 
 
 class PolicyTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        isolated_hydra_home()
+        isolated_aegis_home()
 
     def compile(self, grants, phase="task", env=None):
         prof = Profile("t", "command", grants)
         home = paths.user_home()
-        return prof.compile(phase, project=home / "proj", workspace=paths.hydra_home() / "ws",
-                            tmp=paths.hydra_home() / "tmp", host_env=env or {"PATH": "/bin", "GH_TOKEN": "x"})
+        return prof.compile(phase, project=home / "proj", workspace=paths.aegis_home() / "ws",
+                            tmp=paths.aegis_home() / "tmp", host_env=env or {"PATH": "/bin", "GH_TOKEN": "x"})
 
     def test_default_denies_home_and_secrets(self):
         spec = self.compile([])
@@ -25,7 +25,7 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(expected_fs(spec.fs_rules, home / ".ssh" / "id_rsa", "read"), "deny")
         self.assertEqual(expected_fs(spec.fs_rules, home / "other-project" / "a.txt", "read"), "deny")
         self.assertEqual(expected_fs(spec.fs_rules, home / "proj" / "a.txt", "read"), "deny")
-        self.assertEqual(expected_fs(spec.fs_rules, paths.hydra_home() / "ws" / "a.txt", "write"), "allow")
+        self.assertEqual(expected_fs(spec.fs_rules, paths.aegis_home() / "ws" / "a.txt", "write"), "allow")
         self.assertEqual(expected_fs(spec.fs_rules, home / "x.txt", "write"), "deny")
         self.assertEqual(expected_fs(spec.fs_rules, Path("/usr/bin/env"), "write"), "deny")
         self.assertIsNone(spec.network)
@@ -37,7 +37,7 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(expected_fs(spec.fs_rules, home / ".ssh" / "id_rsa", "read"), "deny")
         self.assertEqual(expected_fs(spec.fs_rules, home / ".aws" / "credentials", "read"), "deny")
         self.assertEqual(expected_fs(spec.fs_rules, home / "proj" / "main.py", "read"), "deny")
-        self.assertEqual(expected_fs(spec.fs_rules, paths.hydra_home() / "canary" / "secret.txt", "read"), "deny")
+        self.assertEqual(expected_fs(spec.fs_rules, paths.aegis_home() / "canary" / "secret.txt", "read"), "deny")
 
     def test_explicit_secret_grant(self):
         spec = self.compile([Grant(id="secret:ssh", kind="read", path="~/.ssh")])
@@ -65,7 +65,7 @@ class PolicyTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             Grant(id="bad", kind="read")
         with self.assertRaises(ValueError):
-            Profile.from_dict({"hydra": 1, "name": "x", "agent": "c",
+            Profile.from_dict({"aegis": 1, "name": "x", "agent": "c",
                                "grants": [{"id": "a", "kind": "env", "names": ["X"]}] * 2})
 
     def test_baseline_is_broad(self):

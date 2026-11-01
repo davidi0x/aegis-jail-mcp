@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hydra_guard import workspace
+from aegis_jail import workspace
 
 
 class WorkspaceTest(unittest.TestCase):
@@ -13,8 +13,8 @@ class WorkspaceTest(unittest.TestCase):
         (self.proj / "src").mkdir(parents=True)
         (self.proj / "src" / "a.py").write_text("a = 1\n")
         (self.proj / "b.txt").write_text("b\n")
-        (self.proj / ".hydra").mkdir()
-        (self.proj / ".hydra" / "task.json").write_text("{}")
+        (self.proj / ".aegis").mkdir()
+        (self.proj / ".aegis" / "task.json").write_text("{}")
         self.ws = self.root / "ws"
 
     def tearDown(self):
@@ -22,7 +22,7 @@ class WorkspaceTest(unittest.TestCase):
 
     def test_copy_diff_apply(self):
         base = workspace.create(self.proj, self.ws)
-        self.assertFalse((self.ws / ".hydra").exists())
+        self.assertFalse((self.ws / ".aegis").exists())
         (self.ws / "src" / "a.py").write_text("a = 2\n")
         (self.ws / "b.txt").unlink()
         (self.ws / "c.txt").write_text("new\n")

@@ -3,7 +3,7 @@ import socketserver
 import threading
 import unittest
 
-from hydra_guard.netproxy import FilteringProxy, host_allowed
+from aegis_jail.netproxy import FilteringProxy, host_allowed
 
 
 class Echo(socketserver.BaseRequestHandler):

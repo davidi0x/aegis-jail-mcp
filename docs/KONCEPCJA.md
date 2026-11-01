@@ -1,8 +1,8 @@
-# Hydra
+# Aegis
 
 > Daj AI zadanie. Zachowaj kontrolę nad tym, do czego ma dostęp.
 
-Hydra to (proponowana) aplikacja na Windows i macOS, która pozwala korzystać z agentów AI, dając im dostęp tylko do tego, czego potrzebują do pracy. Pomaga ustawić te granice, sprawdza je w praktyce i pilnuje ich podczas kolejnych zadań.
+Aegis to (proponowana) aplikacja na Windows i macOS, która pozwala korzystać z agentów AI, dając im dostęp tylko do tego, czego potrzebują do pracy. Pomaga ustawić te granice, sprawdza je w praktyce i pilnuje ich podczas kolejnych zadań.
 
 **Status:** koncept produktu — nie opis działającego systemu.
 
@@ -16,13 +16,13 @@ Użytkownik instaluje agenta, podpina projekt, terminal i kilka narzędzi MCP, a
 - czy po aktualizacji dostęp agenta się rozszerzył,
 - jak ograniczyć dostęp bez ciągłych błędów i pytań o zgodę.
 
-Hydra zamienia „daję mu pełny dostęp, żeby działało” w „ma sprawdzony zakres dostępu do tego zadania”.
+Aegis zamienia „daję mu pełny dostęp, żeby działało” w „ma sprawdzony zakres dostępu do tego zadania”.
 
 Pierwsi użytkownicy: programiści, osoby budujące aplikacje z AI, małe zespoły.
 
 ## 2. Darmowa funkcja: automatyczne zawężanie uprawnień z weryfikacją
 
-Użytkownik wybiera projekt, obsługiwanego agenta i reprezentatywne zadanie. Hydra uruchamia je w przygotowanym środowisku, sprawdza wynik, a następnie próbuje wykonać je z mniejszym dostępem. Przykładowy wynik:
+Użytkownik wybiera projekt, obsługiwanego agenta i reprezentatywne zadanie. Aegis uruchamia je w przygotowanym środowisku, sprawdza wynik, a następnie próbuje wykonać je z mniejszym dostępem. Przykładowy wynik:
 
 > Zadanie przeszło testy bez dostępu do kluczy SSH, pozostałych projektów i internetu po instalacji zależności. Zapisz ten profil dla kolejnych sesji.
 
@@ -30,7 +30,7 @@ Wyróżnik: połączenie ograniczenia uprawnień z dowodem, że praca nadal się
 
 ## 3. W czym pomaga
 
-| Sytuacja | Co robi Hydra | Korzyść |
+| Sytuacja | Co robi Aegis | Korzyść |
 |---|---|---|
 | „Agent ma poprawić stronę” | Ogranicza pracę do projektu i niezbędnych narzędzi | Inne projekty i prywatne pliki poza zasięgiem |
 | „Nie wiem, jakie uprawnienia ustawić” | Proponuje ograniczenia i testuje je na zadaniach | Mniej ręcznej konfiguracji |
@@ -44,7 +44,7 @@ Cofanie dotyczy plików w roboczej kopii. Wysłany e-mail, publikacja czy zmiana
 
 ## 4. Przepływ użytkownika
 
-**Pierwsze uruchomienie** — instalacja, wybór agenta i folderu projektu. Hydra pokazuje zakres ochrony i przygotowuje środowisko (bez ręcznej instalacji Linuksa).
+**Pierwsze uruchomienie** — instalacja, wybór agenta i folderu projektu. Aegis pokazuje zakres ochrony i przygotowuje środowisko (bez ręcznej instalacji Linuksa).
 
 **Przed zadaniem**
 
@@ -60,7 +60,7 @@ Publikacja zmian: wymaga osobnej zgody
 
 **Po zadaniu** — zmienione pliki, wyniki niezależnych testów, zablokowane operacje, wykorzystane wyjątki; akceptacja zmian i opcjonalna optymalizacja uprawnień.
 
-## 5. Warstwy („adaptacyjna Hydra”)
+## 5. Warstwy („adaptacyjna Aegis”)
 
 | Warstwa | Odpowiedzialność |
 |---|---|

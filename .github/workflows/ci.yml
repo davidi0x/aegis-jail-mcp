@@ -13,7 +13,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
-      HYDRA_REQUIRE_SANDBOX: "1"
+      AEGIS_REQUIRE_SANDBOX: "1"
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
@@ -27,14 +27,15 @@ jobs:
           sudo apt-get install -y bubblewrap
           # Ubuntu 24.04 restricts unprivileged user namespaces via AppArmor.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
-      - name: Install Hydra
+      - name: Install Aegis
         run: python -m pip install .
       - name: Doctor
-        run: hydra doctor
+        run: aegis doctor
       - name: Unit + sandbox tests
         run: python -m unittest discover -s tests -t . -v
+      - name: Demo (prompt-injected agent, contained)
+        run: aegis demo
       - name: Boundary probe on the demo project
-        run: hydra probe --project examples/demo-project
-      - name: Demo run (scripted agent)
-        if: runner.os != 'Windows'
-        run: hydra run --project examples/demo-project
+        run: aegis probe --project aegis_jail/demo
+      - name: Plugin entry point works without installation
+        run: python scripts/aegis.py --version
