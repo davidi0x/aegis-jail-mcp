@@ -171,6 +171,14 @@ if __name__ == "__main__":
     unittest.main()
 
 
+def _acl(path) -> str:
+    """The file's Windows permissions as text (empty elsewhere)."""
+    if os.name != "nt":
+        return ""
+    r = subprocess.run(["icacls", str(path)], capture_output=True, text=True)
+    return r.stdout.replace(str(path), "").strip()
+
+
 class SessionTest(unittest.TestCase):
     """`aegis wrap` / `mcp-jail` run against the real project: writable only on request, secrets masked."""
 
@@ -209,20 +217,24 @@ class SessionTest(unittest.TestCase):
         finally:
             shutil.rmtree(project.parent, ignore_errors=True)
 
-    def test_credential_files_masked_or_refused(self):
+    def test_credential_files_masked(self):
         isolated_aegis_home()
         project = demo_copy()
         try:
-            (project / ".env").write_text(f"STRIPE={fake_stripe()}\n")
+            env = project / ".env"
+            env.write_text(f"STRIPE={fake_stripe()}\n")
+            acl_before = _acl(env)
             sess = self._session(project, True)
-            if backend_or_skip(self).name.startswith("windows"):
-                with self.assertRaises(ValueError):  # fail closed where masking is impossible
-                    sess.prepare()
-                return
-            text = self._run(sess, "try:\n    print('ENV=' + open('.env').read())\nexcept Exception:\n    print('ENVERR')\n")
+            text = self._run(sess, (
+                "open('made2.txt','w').write('ok')\n"                      # can still create new files
+                "print('README=' + open('README.md').read()[:8])\n"        # other files stay usable
+                "try:\n    print('ENV=' + open('.env').read())\nexcept Exception:\n    print('ENVERR')\n"))
             self.assertNotIn(fake_stripe(), text)
+            self.assertIn("README=", text)
             self.assertIn(".env", sess.hidden_files)
-            self.assertEqual((project / ".env").read_text(), f"STRIPE={fake_stripe()}\n")  # untouched on the host
+            self.assertEqual((project / "made2.txt").read_text(), "ok", text)
+            self.assertEqual(env.read_text(), f"STRIPE={fake_stripe()}\n")  # untouched on the host
+            self.assertEqual(_acl(env), acl_before, "the file's permissions must be restored exactly")
         finally:
             shutil.rmtree(project.parent, ignore_errors=True)
 

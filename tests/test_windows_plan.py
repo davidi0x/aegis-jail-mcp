@@ -33,6 +33,19 @@ class WindowsPlanTest(unittest.TestCase):
         self.assertFalse(any(p.startswith("home/.ssh") for p in paths), plan)
         self.assertNotIn("home/.aegis", paths)
 
+    def test_write_grant_is_masked_not_carved(self):
+        h = self.root / "home"
+        proj = h / "code"
+        (proj / ".env").write_text("X=1")
+        rules = [("deny", h), ("write", proj), ("deny", proj / ".env")]
+        plan = AppContainerBackend.plan_acls(rules)
+        self.assertEqual([(p.name, perm, inh) for p, perm, inh in plan], [("code", "M", True)])  # whole, inheritable
+        self.assertEqual(AppContainerBackend.plan_masks(rules), [proj / ".env"])
+        # a read grant is still carved (nothing needs to be created in it) and masks nothing
+        read_rules = [("deny", h), ("read", proj), ("deny", proj / ".env")]
+        self.assertEqual(AppContainerBackend.plan_masks(read_rules), [])
+        self.assertTrue(any(not inh for _, _, inh in AppContainerBackend.plan_acls(read_rules)))
+
     def test_grant_inside_later_deny_is_dropped(self):
         h = self.root / "home"
         rules = [("read", h / "code"), ("deny", h)]

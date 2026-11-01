@@ -110,6 +110,8 @@ if sys.platform == "win32":  # pragma: no cover - exercised on Windows CI
     kernel32.WaitForSingleObject.restype = wintypes.DWORD
     kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
     kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
     kernel32.LocalFree.argtypes = [LPVOID]
     advapi32.FreeSid.argtypes = [PSID]
 
@@ -181,20 +183,66 @@ class AppContainerBackend(Backend):
             if any(_within(a, d) for d in later_denies):
                 continue
             perm = "M" if action == "write" else "RX"
-            inside = [d for d in later_denies if _within(d, a)]
+            # A carved directory could not create new files, so denied paths inside a *write* grant are
+            # not carved: the grant stays whole and those paths are masked (see plan_masks) instead.
+            inside = [] if action == "write" else [d for d in later_denies if _within(d, a)]
             _carve(a, perm, inside, out)
         return out
 
-    def _apply_acls(self, spec: SandboxSpec, sid: str) -> list[Path]:
-        touched: list[Path] = []
+    @staticmethod
+    def plan_masks(rules: list[tuple[str, Path]]) -> list[Path]:
+        """Denied paths that live inside a write grant. They are hidden by detaching just that one
+        path from its parent's inherited permissions and removing the container from it; the original
+        permissions are saved first and restored exactly afterwards."""
+        out: list[Path] = []
+        for i, (action, a) in enumerate(rules):
+            if action != "write" or not a.exists():
+                continue
+            later_denies = [d for act, d in rules[i + 1:] if act == "deny"]
+            if any(_within(a, d) for d in later_denies):
+                continue
+            for d in later_denies:
+                if _within(d, a) and not _within(a, d) and d.exists() and d not in out:
+                    out.append(d)
+        return out
+
+    def _apply_acls(self, spec: SandboxSpec, sid: str, touched: list[Path], masks: list[dict]) -> None:
+        """Grant access and mask hidden paths. `touched` and `masks` are filled as work happens, so the
+        caller can undo exactly what was done even if this raises half way."""
         plan = self.plan_acls(spec.fs_rules)
-        # Journal first: if Aegis is killed mid-run, the next start removes these ACEs.
-        _journal(sid).write_text(json.dumps({"sid": sid, "paths": [str(p) for p, _, _ in plan]}), encoding="utf-8")
+        to_mask = self.plan_masks(spec.fs_rules)
+        _check_mask_conflicts(to_mask, sid)
+        if len(to_mask) > MAX_MASKS:
+            raise ValueError(f"{len(to_mask)} credential files would have to be masked one by one; the limit on "
+                             f"Windows is {MAX_MASKS}. Use `aegis run` (it works on a copy without them) or "
+                             "move them out of the project.")
+        jfile = _journal(sid)
+        jdata = {"sid": sid, "pid": os.getpid(), "paths": [str(p) for p, _, _ in plan], "masks": []}
+        # 1. Save the original permissions BEFORE any grant touches them, and journal everything, so that
+        #    a crash can be repaired by the next start.
+        for n, m in enumerate(to_mask):
+            backup = jfile.with_name(f"{sid}.{n}.acl")
+            _icacls(str(m), "/save", str(backup), "/Q")
+            entry = {"path": str(m), "backup": str(backup)}
+            jdata["masks"].append(entry)
+            masks.append(entry)
+        jfile.write_text(json.dumps(jdata), encoding="utf-8")
+        # 2. Grants.
         for path, perm, inherit in plan:
             flags = "(OI)(CI)" if inherit and path.is_dir() else ""
             _icacls(str(path), "/grant", f"*{sid}:{flags}({perm})", "/Q")
             touched.append(path)
-        return touched
+        # 3. Masks: keep every inherited entry (so the user's own access is unchanged) but cut this one
+        #    path off from the grant it would otherwise inherit, and drop the container from it.
+        for m in to_mask:
+            _icacls(str(m), "/inheritance:d", "/Q")
+            _icacls(str(m), "/remove", f"*{sid}", "/Q")
+
+    def _restore_masks(self, masks: list[dict]) -> bool:
+        ok = True
+        for entry in reversed(masks):
+            ok = _restore_mask(entry) and ok
+        return ok
 
     def _remove_acls(self, touched: list[Path], sid: str) -> None:
         for p in reversed(touched):
@@ -230,6 +278,7 @@ class AppContainerBackend(Backend):
         persistent = False
         lock = None
         touched: list[Path] = []
+        masks: list[dict] = []
         loopback = False
         sid = self._profile(name, cap_arr, len(cap_sids))
         sid_str = _sid_to_str(sid)
@@ -252,14 +301,15 @@ class AppContainerBackend(Backend):
                             "`aegis windows-setup` (or run Aegis elevated)")
                     lock = _acquire_lock()
                 env.update(proxy_env(f"http://127.0.0.1:{proxy.tcp_port}"))
-            touched = self._apply_acls(spec, sid_str)
+            self._apply_acls(spec, sid_str, touched, masks)
             return self._spawn(sid, cap_arr, len(cap_sids), argv, env, spec.cwd, log_path, timeout, stdio)
         finally:
             self._remove_acls(touched, sid_str)
-            try:
-                _journal(sid_str).unlink()
-            except OSError:
-                pass
+            if self._restore_masks(masks):  # on failure the journal stays, and the next start retries
+                try:
+                    _journal(sid_str).unlink()
+                except OSError:
+                    pass
             if loopback:
                 subprocess.run(["CheckNetIsolation.exe", "LoopbackExempt", "-d", f"-p={sid_str}"],
                                capture_output=True)
@@ -363,20 +413,82 @@ def _journal(sid: str) -> Path:
     return d / f"{sid}.json"
 
 
+MAX_MASKS = 50
+
+
+def _pid_alive(pid) -> bool:
+    if not isinstance(pid, int) or pid <= 0 or sys.platform != "win32":
+        return False
+    h = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    code = wintypes.DWORD()
+    ok = kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+    kernel32.CloseHandle(h)
+    return bool(ok) and code.value == 259  # STILL_ACTIVE
+
+
+def _restore_mask(entry: dict) -> bool:
+    """Put a masked path's saved permissions back exactly (icacls /restore on its parent directory)."""
+    p, backup = Path(entry["path"]), Path(entry["backup"])
+    if not backup.exists():
+        return True
+    try:
+        r = subprocess.run(["icacls", str(p.parent), "/restore", str(backup), "/Q"], capture_output=True, text=True)
+    except OSError:
+        return False
+    if r.returncode != 0 and p.exists():
+        return False
+    try:
+        backup.unlink()
+    except OSError:
+        pass
+    return True
+
+
+def _check_mask_conflicts(paths_to_mask: list[Path], sid: str) -> None:
+    """Refuse to mask a path that another *running* Aegis session is already masking: the second
+    session would save the first one's temporary permissions as the 'original'."""
+    from aegis_jail import paths
+    d = paths.aegis_home() / "acl-journal"
+    if not d.exists() or not paths_to_mask:
+        return
+    mine = {str(p).lower() for p in paths_to_mask}
+    for j in d.glob("*.json"):
+        try:
+            data = json.loads(j.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if data.get("sid") == sid or not _pid_alive(data.get("pid")):
+            continue
+        clash = mine & {str(m.get("path", "")).lower() for m in data.get("masks", [])}
+        if clash:
+            raise ValueError("another running Aegis session is already masking " + ", ".join(sorted(clash))
+                             + ". Wait for it to finish (or stop it) and try again.")
+
+
 def _recover_stale_acls() -> None:
-    """Remove ACEs left behind by a run that crashed (journal entries older than a day or orphaned)."""
+    """Undo what a crashed Aegis left behind: remove the container's ACEs and restore masked paths.
+
+    A journal belongs to a crashed run when its process is gone (older journals without a pid are
+    treated as crashed after a day)."""
     from aegis_jail import paths
     d = paths.aegis_home() / "acl-journal"
     if not d.exists():
         return
     for j in d.glob("*.json"):
         try:
-            if time.time() - j.stat().st_mtime < 24 * 3600:
-                continue
             data = json.loads(j.read_text(encoding="utf-8"))
+            pid = data.get("pid")
+            if pid is not None:
+                if _pid_alive(pid):
+                    continue
+            elif time.time() - j.stat().st_mtime < 24 * 3600:
+                continue
             for p in data.get("paths", []):
                 subprocess.run(["icacls", p, "/remove", f"*{data['sid']}", "/Q"], capture_output=True)
-            j.unlink()
+            if all(_restore_mask(m) for m in reversed(data.get("masks", []))):
+                j.unlink()
         except (OSError, ValueError, KeyError):
             continue
 INFINITE = 0xFFFFFFFF
