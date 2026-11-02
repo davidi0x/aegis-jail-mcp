@@ -127,6 +127,6 @@ jobs:
           root = pathlib.Path(aegis_jail.__file__).parent / "demo"
           for rel in (".aegis/task.json", ".aegis/profiles/default.json", "src/calc.py", "tools/scripted_agent.py"):
               assert (root / rel).exists(), f"{rel} is missing from the wheel"
-          for rel in ("index.html", "app.js", "app.css"):
+          for rel in ("index.html", "app.js", "app.css", "fonts/figtree.woff2", "fonts/jetbrains-mono.woff2"):
               assert (root.parent / "web" / rel).exists(), f"dashboard {rel} is missing from the wheel"
           PY

@@ -18,3 +18,6 @@ Network use is distribution: if you run a modified version of this software to
 provide a service over a network, Section 13 of the AGPL requires you to offer
 the users of that service the complete corresponding source code of your
 modified version.
+
+The dashboard bundles the Figtree and JetBrains Mono typefaces, licensed under the
+SIL Open Font License 1.1 (see aegis_jail/web/fonts/OFL-*.txt).

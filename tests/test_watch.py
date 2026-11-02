@@ -205,6 +205,20 @@ class DashboardTest(WatchBase):
             self.assertEqual(r.status, 200)
             self.assertIn("default-src 'self'", r.getheader("Content-Security-Policy"))
 
+    def test_run_from_dashboard_is_validated(self):
+        with self.assertRaises(ValueError):
+            dashboard.start_run("/etc", "claude-code", "x", known=[str(self.tmp)])
+        with self.assertRaises(ValueError):
+            dashboard.start_run(str(self.tmp), "rm -rf", "x", known=[str(self.tmp)])
+        with self.assertRaises(ValueError):
+            dashboard.start_run(str(self.tmp), "codex", "   ", known=[str(self.tmp)])
+        auth = {"Cookie": f"{dashboard.COOKIE}={self.token}", "Origin": f"http://127.0.0.1:{self.port}"}
+        r, _ = self.req("POST", "/api/action", {"kind": "run", "project": "/", "agent": "codex", "prompt": "hi"}, auth)
+        self.assertEqual(r.status, 400)
+        for font in ("/fonts/figtree.woff2", "/fonts/jetbrains-mono.woff2"):
+            r, _ = self.req("GET", font, headers=auth)
+            self.assertEqual(r.status, 200)
+
     def test_rejects_foreign_host(self):
         r, _ = self.req("GET", "/api/state", headers={"Host": "attacker.example",
                                                       "Cookie": f"{dashboard.COOKIE}={self.token}"})

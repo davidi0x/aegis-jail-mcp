@@ -24,6 +24,8 @@ from aegis_jail import __version__, paths, watch
 
 WEB = Path(__file__).parent / "web"
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/app.css": ("app.css", "text/css; charset=utf-8"),
+          "/fonts/figtree.woff2": ("fonts/figtree.woff2", "font/woff2"),
+          "/fonts/jetbrains-mono.woff2": ("fonts/jetbrains-mono.woff2", "font/woff2"),
           "/app.js": ("app.js", "text/javascript; charset=utf-8")}
 COOKIE = "aegis_dash"
 
@@ -63,6 +65,8 @@ def _runs(limit: int = 80) -> list[dict]:
             "changes": [{"path": c.get("path"), "kind": c.get("kind"), "risk": c.get("risk", "")} for c in d.get("changes", [])],
             "tripwires": d.get("tripwires", []), "blocked": blocked, "denials": hints[:12],
             "hidden": d.get("hidden", [])[:40], "workspace": (rep.parent / "workspace").exists(),
+            "prompt": ((d.get("task") or {}).get("prompt") or " ".join((d.get("task") or {}).get("command") or []))[:200],
+            "duration": round(sum(p.get("duration", 0) for p in d.get("phases", [])), 2),
         })
     out.sort(key=lambda r: r["started"], reverse=True)
     return out[:limit]
@@ -96,6 +100,94 @@ def _pins() -> dict:
     return out
 
 
+AGENT_INFO = [("claude-code", "Claude", "Anthropic"), ("codex", "Codex", "OpenAI"), ("gemini", "Gemini", "Google"),
+              ("aider", "Aider", "open source")]
+_AGENT_CACHE: dict = {"t": 0.0, "data": []}
+
+
+def _agents(runs: list[dict]) -> list[dict]:
+    """Which agent CLIs are installed (cached for five minutes) and how their sandboxed runs went."""
+    if time.time() - _AGENT_CACHE["t"] > 300:
+        from aegis_jail.agents import Task, get_agent
+        data = []
+        for aid, name, vendor in AGENT_INFO:
+            try:
+                ver = get_agent(aid).version(Task(agent=aid))
+            except Exception:  # noqa: BLE001
+                ver = "not installed"
+            data.append({"id": aid, "name": name, "vendor": vendor, "version": ver,
+                         "installed": ver != "not installed"})
+        _AGENT_CACHE.update(t=time.time(), data=data)
+    out = []
+    for a in _AGENT_CACHE["data"]:
+        mine = [r for r in runs if r["agent"] == a["id"]]
+        out.append({**a, "runs": len(mine), "passed": sum(1 for r in mine if r["ok"]),
+                    "tripwires": sum(1 for r in mine if r["tripwires"]),
+                    "end_to_end_tested": a["id"] == "claude-code"})
+    return out
+
+
+def _projects(runs: list[dict]) -> list[dict]:
+    seen: list[Path] = []
+    for p in [*watch.known_projects(), *(Path(r["project"]) for r in runs if r["project"])]:
+        p = Path(p)
+        if p.is_dir() and p not in seen:
+            seen.append(p)
+    out = []
+    for p in seen[:40]:
+        prof_dir = paths.project_config_dir(p) / "profiles"
+        profiles = sorted(x.stem for x in prof_dir.glob("*.json")) if prof_dir.is_dir() else []
+        if "default" not in profiles:
+            profiles.insert(0, "default")
+        out.append({"path": str(p), "name": p.name, "profiles": profiles,
+                    "runs": sum(1 for r in runs if r["project"] == str(p)),
+                    "task": (paths.project_config_dir(p) / "task.json").exists()})
+    return out
+
+
+def _active() -> list[dict]:
+    """Runs started from the dashboard that are still going."""
+    p = watch.watch_dir() / "active.json"
+    items = watch._read_json(p, [])
+    alive = [a for a in items if watch._pid_alive(a.get("pid", 0))]
+    if len(alive) != len(items):
+        watch._write_json(p, alive)
+    return alive
+
+
+def start_run(project: str, agent: str, prompt: str, known: list[str]) -> dict:
+    import subprocess
+    import sys
+    if project not in known:
+        raise ValueError("pick one of the projects Aegis knows about")
+    if agent not in {a for a, _, _ in AGENT_INFO}:
+        raise ValueError("unknown agent")
+    prompt = prompt.strip()
+    if not prompt or len(prompt) > 4000:
+        raise ValueError("describe the task in a few words (up to 4000 characters)")
+    log = (watch.watch_dir() / "dashboard-runs.log").open("a", encoding="utf-8")
+    proc = subprocess.Popen([sys.executable, "-m", "aegis_jail", "run", "--project", project, "--agent", agent,
+                             "--prompt", prompt], stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                            cwd=project)
+    items = _active()
+    items.append({"pid": proc.pid, "project": project, "agent": agent, "prompt": prompt[:200], "started": time.time()})
+    watch._write_json(watch.watch_dir() / "active.json", items)
+    return {"ok": True, "message": f"Started {agent} in the sandbox on {Path(project).name}. "
+                                   "Its changes wait for your review."}
+
+
+def _setup() -> dict:
+    import platform
+    import sys
+    from aegis_jail.sandbox import SandboxUnavailable, get_backend
+    try:
+        backend, ok, why = get_backend().name, True, ""
+    except SandboxUnavailable as e:
+        backend, ok, why = "unavailable", False, str(e)
+    return {"backend": backend, "backend_ok": ok, "backend_note": why, "system": platform.system(),
+            "machine": platform.machine(), "python": sys.version.split()[0], "version": __version__}
+
+
 _LAST_SCAN = {"t": 0.0}
 
 
@@ -112,6 +204,9 @@ def state() -> dict:
     events = watch.all_events()
     runs = _runs()
     servers = watch.mcp_servers()
+    originals = watch._read_json(watch.watch_dir() / "originals.json", {})
+    for srv in servers:
+        srv["restorable"] = bool(srv.get("jsonpath")) and watch._event_id(srv["file"], *srv["jsonpath"]) in originals
     local = [s for s in servers if not s["remote"]]
     from aegis_jail.sandbox import get_backend
     try:
@@ -120,7 +215,8 @@ def state() -> dict:
         backend = "unavailable"
     return {
         "version": __version__, "backend": backend, "home": str(paths.aegis_home()), "now": time.time(),
-        "watch": st, "events": events[:300], "runs": runs, "servers": servers, "activity": _activity(), "pins": _pins(),
+        "watch": st, "events": events[:300], "runs": runs, "agents": _agents(runs), "projects": _projects(runs),
+        "active": _active(), "setup": _setup(), "servers": servers, "activity": _activity(), "pins": _pins(),
         "counts": {
             "open": sum(1 for e in events if e["status"] == "open"),
             "open_high": sum(1 for e in events if e["status"] == "open" and e["severity"] == "high"),
@@ -149,14 +245,19 @@ def _diff(key: str, run_id: str) -> str:
 
 
 def _change_marker() -> str:
+    """Changes when something the page shows changes (not on every Autopilot pass)."""
+    home = paths.aegis_home()
+    files = [watch.events_path(), watch.watch_dir() / "resolved.json", watch.watch_dir() / "config.json",
+             watch.watch_dir() / "originals.json", watch.watch_dir() / "active.json",
+             *(home / "mcp").glob("*.jsonl"), *(home / "runs").glob("*/*/report.json")]
     parts = []
-    for p in (watch.events_path(), watch.watch_dir() / "resolved.json", watch.watch_dir() / "state.json",
-              watch.watch_dir() / "config.json"):
+    for p in files:
         try:
-            parts.append(f"{p.stat().st_mtime_ns}")
+            parts.append(f"{p.name}:{p.stat().st_mtime_ns}")
         except OSError:
             parts.append("0")
-    return "-".join(parts)
+    import hashlib
+    return hashlib.sha1("|".join(parts).encode()).hexdigest()[:16]
 
 
 # ---------------------------------------------------------------------------------------------- server
@@ -270,6 +371,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if kind == "unjail":
             watch.unjail_server(str(b["file"]), [str(x) for x in b["jsonpath"]])
             return {"ok": True, "message": "Restored the original entry."}
+        if kind == "run":
+            known = [p["path"] for p in _projects(_runs())]
+            return start_run(str(b.get("project", "")), str(b.get("agent", "")), str(b.get("prompt", "")), known)
         if kind == "scan":
             new = watch.scan_once(dict(watch.load_config(), responder="", notify=False))
             return {"ok": True, "message": f"Checked. {len(new)} new event(s)."}
