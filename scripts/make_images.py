@@ -330,7 +330,6 @@ def main() -> None:
                  "aegis scan: what could hijack an agent in this repo?", "scan.svg")
     print("wrote", ", ".join(sorted(p.name for p in OUT.glob("*.svg"))))
     if a.png:
-        import shutil
         import subprocess
         import tempfile
         js = """const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();

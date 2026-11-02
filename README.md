@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="docs/images/demo-live.gif" alt="Real recording: an agent fixes a bug inside the Aegis sandbox while its attempts to steal keys and write to ~/.bashrc are contained" width="80%"><br>
-  <sub>A real, unedited terminal recording (<code>scripts/demo/</code> regenerates it). The agent is a small script standing in for an AI, so you can reproduce it without an API key.</sub>
+  <sub>A real, unedited terminal recording. The agent is a small script standing in for an AI, so you can reproduce it without an API key.</sub>
 </p>
 
 <p align="center">
@@ -284,7 +284,7 @@ aegis dashboard         # open the local dashboard
 
 On every pass it:
 
-- reads the MCP configs of **Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and Codex** and flags servers that run with your full user rights. With `aegis watch set auto_jail=on` it wraps them in `aegis mcp-jail` itself, keeping the original entry so you can undo it;
+- reads the MCP configs of **Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and Codex** and flags servers that run with your full user rights. With `aegis watch set auto_jail=on` it wraps them in `aegis mcp-jail` itself, keeping the original entry so you can undo it (also for Codex's `config.toml`);
 - follows the audit logs of jailed servers: **rug pulls**, poisoned tools, blocked calls, sampling and secret-egress attempts;
 - reads new `aegis run` reports: **tripwires**, blocked connections, runs waiting for review;
 - scans every project Claude Code opens for the first time for hidden instructions aimed at AI.
@@ -454,7 +454,7 @@ Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it a
 
 ## Honest limits
 
-- **Autopilot responders:** the Claude Code responder is tested; the Codex responder is built from Codex's documented CLI but not yet tested end to end. Codex's TOML config is read, never rewritten, so Autopilot reports its servers but cannot jail them for you.
+- **Autopilot responders:** the Claude Code responder is tested end to end; the Codex responder is built from Codex's documented CLI but not yet tested with Codex itself (the Codex config editing is tested). Jailing Codex servers needs Python 3.11 or newer.
 - **Evidence, not proof.** `optimize` shows that *these tasks* pass with a profile. Agents are nondeterministic, so use `--confirm 2` or more.
 - **Host allowlists go through an HTTP(S) proxy.** Programs that ignore `HTTPS_PROXY` are blocked, not let through. TLS contents are not inspected (that would mean intercepting your traffic), so keep allowlists small: an allowed host can still receive data.
 - **macOS:** the most dangerous Mach services are blocked, not all of them. **Decoys are Linux-only**: macOS and Windows hide the real files instead of replacing them.

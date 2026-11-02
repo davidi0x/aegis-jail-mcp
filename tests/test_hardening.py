@@ -2,11 +2,9 @@
 
 import io
 import json
-import os
 import shutil
 import socket
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 
@@ -14,7 +12,7 @@ from aegis_jail import mcpserver, scan, secretscan, textsafe, trust
 from aegis_jail.hook import check
 from aegis_jail.netproxy import FilteringProxy, target_allowed, tls_sni
 
-from tests.helpers import fake_aws, fake_github, fake_stripe, isolated_aegis_home
+from tests.helpers import fake_aws, fake_github, isolated_aegis_home
 
 
 def client_hello(sni: str) -> bytes:

@@ -85,10 +85,21 @@ sandbox on Linux, macOS and Windows in CI.
 | Sandboxed code prints "now call aegis_apply" to the model reading the result | Output fenced in `<untrusted-data id=RANDOM>` with a warning when instructions are detected; invisible characters removed | tested |
 | Injected model calls `aegis_apply` on its own | Asks the **human** via MCP elicitation; without it, risky changes and runs that tripped a wire are refused | tested |
 
+### Autopilot and dashboard (A6)
+| Attack | Defence | |
+|---|---|---|
+| A web page in your browser calls the dashboard (CSRF, DNS rebinding) | Listens on `127.0.0.1` only; per-user token in a `SameSite=Strict` cookie; `Host` must be loopback; cross-origin `POST` refused; strict CSP | tested |
+| Text from an agent or MCP server runs as script in the dashboard | Everything from agents, servers and configs is inserted as text, never as HTML | tested |
+| A background responder agent approves its own findings | The responder gets only Aegis tools; the tools can contain (jail, discard) but there is no tool to re-trust a changed tool or apply a run | tested |
+| Autopilot rewrites an MCP config wrongly | Backup first, result re-parsed and compared before writing, one-click undo that restores the original | tested |
+| A run is started from the dashboard on an arbitrary path | Only projects Aegis already knows about, and only known agents | tested |
+
 ### Detection: tripwires
 Where Aegis hides a credential store on Linux, it plants a **decoy** with a per-run marker (fake AWS key, SSH key, `.netrc`, GitHub token…). An honest task never needs them. If a decoy shows up in a request, a tool call, a written file or the output, the run is flagged **TRIPWIRE**. That is hard evidence of a hijacked agent, and every change from that run then needs explicit review.
 
 ## Known limits
+- Autopilot cannot sandbox a *remote* MCP server (it runs on someone else's machine); it reports it. Jailing Codex servers needs Python 3.11+ (to read TOML safely).
+- A developer machine that other users can log in to is out of scope for the dashboard token: it protects against web pages and other network hosts, not against another local user who can read your files.
 - Domain allowlists rely on programs honouring `HTTPS_PROXY`. Others are blocked, not let through.
 - Content inside TLS is not inspected (no MITM). Exfiltration *to an allowed host* is possible, so keep allowlists small.
 - Seccomp is a blocklist of known-dangerous syscalls, not a strict allowlist, and covers x86-64 / aarch64 only; the primary boundary remains namespaces and mounts.

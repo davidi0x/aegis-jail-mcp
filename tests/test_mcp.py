@@ -12,7 +12,7 @@ from aegis_jail import mcpserver
 from aegis_jail.hook import check
 from aegis_jail.mcpjail import McpFilter, ToolFirewall
 
-from tests.helpers import fake_aws, fake_github, fake_stripe, ROOT, backend_or_skip, demo_copy, isolated_aegis_home
+from tests.helpers import fake_aws, fake_stripe, ROOT, backend_or_skip, demo_copy, isolated_aegis_home
 
 FAKE = Path(__file__).resolve().parent / "fake_mcp_server.py"
 

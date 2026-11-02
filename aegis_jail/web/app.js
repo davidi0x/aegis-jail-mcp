@@ -602,8 +602,16 @@ function render() {
   paintIcons(); paintMascots();
   seenEvents = new Set(S.events.map((e) => e.id));
 }
+let lastSig = "";
 async function refresh() {
-  try { S = await api("/api/state"); document.body.classList.remove("loading"); $("#offline").hidden = true; render(); }
+  try {
+    const next = await api("/api/state");
+    document.body.classList.remove("loading"); $("#offline").hidden = true;
+    // Rebuild the page only when something visible changed, so buttons never move under the cursor for nothing.
+    const sig = JSON.stringify(next, (k, v) => (k === "now" || k === "last_pass" ? undefined : v));
+    const changed = sig !== lastSig; lastSig = sig; S = next;
+    if (changed) render(); else renderStatus();
+  }
   catch (err) { const o = $("#offline"); o.querySelector("span").textContent = err.message.startsWith("Session") ? err.message : "Aegis is not reachable. Is `aegis dashboard` or `aegis watch` still running?"; o.hidden = false; }
 }
 

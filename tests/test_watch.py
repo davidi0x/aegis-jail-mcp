@@ -119,6 +119,81 @@ class WatchTest(WatchBase):
         self.assertIn("--strict-mcp-config", cmd)
 
 
+CODEX_TOML = """\
+model = "gpt-5"
+
+[mcp_servers.docs]            # first server
+command = "npx"
+args = [
+  "-y",
+  "@acme/docs-mcp",
+  "--root", "/srv/docs",
+]
+startup_timeout_sec = 20
+
+[mcp_servers.docs.env]
+API_TOKEN = "secret-value"
+
+[mcp_servers.other]
+command = "uvx"
+args = ["other-server"]
+env = { LEVEL = "debug" }
+
+[mcp_servers.remote]
+url = "https://mcp.example.com/sse"
+
+[profiles.fast]
+model = "gpt-5-mini"
+"""
+
+
+@unittest.skipUnless(watch._tomllib(), "Codex TOML editing needs Python 3.11+")
+class CodexTest(WatchBase):
+    def setUp(self):
+        super().setUp()
+        (self.home / ".codex").mkdir()
+        self.cfg = self.home / ".codex" / "config.toml"
+        self.cfg.write_text(CODEX_TOML, encoding="utf-8")
+
+    def load(self):
+        return watch._tomllib().loads(self.cfg.read_text(encoding="utf-8"))
+
+    def test_lists_and_flags_codex_servers(self):
+        servers = {s["name"]: s for s in watch.mcp_servers() if s["client"] == "Codex"}
+        self.assertEqual(set(servers), {"docs", "other", "remote"})
+        self.assertTrue(servers["docs"]["editable"] and not servers["docs"]["jailed"])
+        self.assertTrue(servers["remote"]["remote"] and not servers["remote"]["editable"])
+        kinds = sorted(e.kind for e in watch.scan_once())
+        self.assertEqual(kinds, ["mcp_remote", "mcp_unjailed", "mcp_unjailed"])
+
+    def test_jail_rewrites_only_that_table_and_undo_restores_it(self):
+        res = watch.jail_server(str(self.cfg), ["mcp_servers", "docs"])
+        self.assertTrue(res["changed"])
+        data = self.load()
+        docs = data["mcp_servers"]["docs"]
+        self.assertTrue(watch.is_jailed(docs))
+        self.assertEqual(docs["args"][-5:], ["npx", "-y", "@acme/docs-mcp", "--root", "/srv/docs"])
+        self.assertEqual(docs["env"], {"API_TOKEN": "secret-value"})       # sub-table survives
+        self.assertEqual(docs["startup_timeout_sec"], 20)                  # other keys survive
+        self.assertIn("API_TOKEN", docs["args"][docs["args"].index("--pass-env") + 1])
+        self.assertEqual(data["mcp_servers"]["other"]["command"], "uvx")   # neighbours untouched
+        self.assertEqual(data["profiles"]["fast"]["model"], "gpt-5-mini")
+        self.assertEqual(data["model"], "gpt-5")
+        self.assertIn("# first server", self.cfg.read_text())
+        watch.unjail_server(str(self.cfg), ["mcp_servers", "docs"])
+        self.assertEqual(self.cfg.read_text(encoding="utf-8"), CODEX_TOML)  # byte for byte
+
+    def test_inline_env_and_remote(self):
+        watch.jail_server(str(self.cfg), ["mcp_servers", "other"])
+        other = self.load()["mcp_servers"]["other"]
+        self.assertTrue(watch.is_jailed(other))
+        self.assertEqual(other["env"], {"LEVEL": "debug"})
+        with self.assertRaises(ValueError):
+            watch.jail_server(str(self.cfg), ["mcp_servers", "remote"])
+        with self.assertRaises(KeyError):
+            watch.jail_server(str(self.cfg), ["mcp_servers", "missing"])
+
+
 class StatusTest(WatchBase):
     def test_status_reports_a_live_daemon_only(self):
         self.assertFalse(watch.status()["running"])
@@ -219,6 +294,29 @@ class DashboardTest(WatchBase):
         for font in ("/fonts/figtree.woff2", "/fonts/jetbrains-mono.woff2"):
             r, _ = self.req("GET", font, headers=auth)
             self.assertEqual(r.status, 200)
+
+    def test_busy_port_falls_back_to_the_next_one(self):
+        srv2, url2 = dashboard.start(self.port)
+        try:
+            self.assertNotEqual(srv2.server_address[1], self.port)
+            self.assertIn(str(srv2.server_address[1]), url2)
+        finally:
+            srv2.shutdown()
+            srv2.server_close()
+
+    def test_run_that_never_starts_is_reported(self):
+        proj = self.tmp / "proj"
+        (proj / ".aegis").mkdir(parents=True)
+        (proj / ".aegis" / "task.json").write_text(json.dumps({"name": "t", "agent": "command", "command": ["echo", "hi"]}))
+        dashboard.start_run(str(proj), "claude-code", "do it", known=[str(proj)])
+        import time
+        for _ in range(100):
+            evs = [e for e in watch.all_events() if "did not start" in e["title"]]
+            if evs:
+                break
+            time.sleep(0.2)
+        self.assertTrue(evs, "the failed start should become an event")
+        self.assertIn("approved", evs[0]["detail"])
 
     def test_rejects_foreign_host(self):
         r, _ = self.req("GET", "/api/state", headers={"Host": "attacker.example",

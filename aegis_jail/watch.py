@@ -245,21 +245,129 @@ def _server_entries(path: Path, key: str) -> Iterable[tuple[str, dict, list[str]
                         yield name, entry, ["projects", proj, "mcpServers", name]
 
 
-def codex_servers() -> list[dict]:
-    """Codex keeps MCP servers in TOML. Read-only: listed, never rewritten."""
-    p = _home() / ".codex" / "config.toml"
+def _tomllib():
     try:
         import tomllib  # Python 3.11+
-        data = tomllib.loads(p.read_text(encoding="utf-8"))
-    except (ImportError, OSError, ValueError):
+        return tomllib
+    except ImportError:
+        return None
+
+
+def codex_config() -> Path:
+    return _home() / ".codex" / "config.toml"
+
+
+def codex_servers() -> list[dict]:
+    """Servers in Codex's TOML config. Editable (jailing rewrites only that server's table) on Python 3.11+."""
+    tl, p = _tomllib(), codex_config()
+    if tl is None or not p.exists():
+        return []
+    try:
+        data = tl.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return []
     out = []
     for name, entry in (data.get("mcp_servers") or {}).items():
         if isinstance(entry, dict):
-            out.append({"client": "Codex", "file": str(p), "name": name, "jsonpath": None,
-                        "command": entry.get("command", ""), "args": entry.get("args") or [],
-                        "remote": bool(entry.get("url")), "jailed": is_jailed(entry), "editable": False})
+            remote = bool(entry.get("url"))
+            out.append({"client": "Codex", "file": str(p), "name": name, "jsonpath": ["mcp_servers", name],
+                        "command": entry.get("command", ""), "args": entry.get("args") or [], "url": entry.get("url", ""),
+                        "remote": remote, "jailed": is_jailed(entry), "editable": not remote, "project": ""})
     return out
+
+
+def _toml_table(text: str, name: str) -> tuple[int, int]:
+    """Character range of the `[mcp_servers.NAME]` table (without its sub-tables such as `.env`)."""
+    import re
+    header = re.compile(r'^\[mcp_servers\.(?:%s|"%s"|\'%s\')\][ \t]*(?:#.*)?$' % ((re.escape(name),) * 3), re.M)
+    m = header.search(text)
+    if not m:
+        raise KeyError(f"no [mcp_servers.{name}] table in {codex_config()}")
+    nxt = re.compile(r"^\[", re.M)
+    end = len(text)
+    for n in nxt.finditer(text, m.end()):
+        if not text[n.start():].startswith(("[mcp_servers.%s." % name, '[mcp_servers."%s".' % name)):
+            end = n.start()
+            break
+    return m.start(), end
+
+
+def _drop_toml_keys(block: str, keys: tuple[str, ...]) -> str:
+    """Remove top-level `key = value` lines (values may span several lines when they are arrays)."""
+    import re
+    lines, out, i = block.splitlines(keepends=True), [], 0
+    while i < len(lines):
+        if re.match(r"^\s*(%s)\s*=" % "|".join(keys), lines[i]):
+            depth = lines[i].count("[") - lines[i].count("]")
+            while depth > 0 and i + 1 < len(lines):
+                i += 1
+                depth += lines[i].count("[") - lines[i].count("]")
+            i += 1
+            continue
+        out.append(lines[i])
+        i += 1
+    return "".join(out)
+
+
+def jail_codex(name: str) -> dict:
+    tl, path = _tomllib(), codex_config()
+    if tl is None:
+        raise ValueError("jailing Codex servers needs Python 3.11 or newer")
+    text = path.read_text(encoding="utf-8")
+    entry = (tl.loads(text).get("mcp_servers") or {}).get(name)
+    if not isinstance(entry, dict):
+        raise KeyError(f"no Codex MCP server named {name!r}")
+    if is_jailed(entry):
+        return {"changed": False, "entry": entry}
+    if "command" not in entry:
+        raise ValueError("remote (URL) MCP servers cannot be sandboxed locally; review them instead")
+    start, end = _toml_table(text, name)
+    block = text[start:end]
+    aegis, _ = aegis_invocation()
+    args = aegis[1:] + ["mcp-jail", "--name", name]
+    env = entry.get("env") or {}
+    if env:
+        args += ["--pass-env", ",".join(sorted(env))]
+    if entry.get("cwd"):
+        args += ["--project", str(entry["cwd"])]
+    args += ["--", str(entry["command"]), *[str(a) for a in entry.get("args") or []]]
+    header, _, rest = block.partition("\n")
+    new_block = (header + "\n" + f"command = {json.dumps(aegis[0])}\n"
+                 + "args = [" + ", ".join(json.dumps(a) for a in args) + "]\n"
+                 + _drop_toml_keys(rest, ("command", "args")))
+    new_text = text[:start] + new_block + text[end:]
+    check = (tl.loads(new_text).get("mcp_servers") or {}).get(name) or {}
+    if check.get("command") != aegis[0] or check.get("args") != args or check.get("env") != entry.get("env"):
+        raise ValueError("could not rewrite the Codex config safely; nothing was changed")
+    backups = watch_dir() / "backups"
+    backups.mkdir(exist_ok=True)
+    backup = backups / f"{time.strftime('%Y%m%d-%H%M%S')}-codex-config.toml"
+    shutil.copy2(path, backup)
+    store = _read_json(watch_dir() / "originals.json", {})
+    store[_event_id(str(path), "mcp_servers", name)] = {"file": str(path), "jsonpath": ["mcp_servers", name], "toml_block": block}
+    _write_json(watch_dir() / "originals.json", store)
+    tmp = path.with_suffix(".toml.tmp")
+    tmp.write_text(new_text, encoding="utf-8")
+    os.replace(tmp, path)
+    return {"changed": True, "entry": check, "backup": str(backup)}
+
+
+def unjail_codex(name: str) -> dict:
+    path = codex_config()
+    store = _read_json(watch_dir() / "originals.json", {})
+    key = _event_id(str(path), "mcp_servers", name)
+    if key not in store or "toml_block" not in store[key]:
+        raise KeyError("no saved original for this server (it was not jailed by Aegis Autopilot)")
+    text = path.read_text(encoding="utf-8")
+    start, end = _toml_table(text, name)
+    new_text = text[:start] + store[key]["toml_block"] + text[end:]
+    _tomllib().loads(new_text)
+    tmp = path.with_suffix(".toml.tmp")
+    tmp.write_text(new_text, encoding="utf-8")
+    os.replace(tmp, path)
+    store.pop(key)
+    _write_json(watch_dir() / "originals.json", store)
+    return {"changed": True}
 
 
 def mcp_servers() -> list[dict]:
@@ -280,6 +388,8 @@ def mcp_servers() -> list[dict]:
                         "remote": remote, "url": entry.get("url", ""), "jailed": is_jailed(entry),
                         "editable": not remote, "project": jp[1] if jp[0] == "projects" else ""})
     out.extend(codex_servers())
+    for srv in out:
+        srv.setdefault("restorable", False)
     return out
 
 
@@ -310,6 +420,8 @@ def _get_in(data: dict, jp: list[str]) -> dict:
 def jail_server(file: str, jsonpath: list[str]) -> dict:
     """Rewrite one MCP server entry so it starts through `aegis mcp-jail`. Keeps a backup; reversible."""
     path = Path(file)
+    if path.suffix == ".toml":
+        return jail_codex(jsonpath[-1])
     data = json.loads(path.read_text(encoding="utf-8"))
     entry = _get_in(data, jsonpath)
     if is_jailed(entry):
@@ -342,6 +454,10 @@ def jail_server(file: str, jsonpath: list[str]) -> dict:
 
 
 def unjail_server(file: str, jsonpath: list[str]) -> dict:
+    if Path(file).suffix == ".toml":
+        res = unjail_codex(jsonpath[-1])
+        _reopen_unjailed(file, jsonpath)
+        return res
     store = _read_json(watch_dir() / "originals.json", {})
     key = _event_id(file, *jsonpath)
     if key not in store:
@@ -352,12 +468,16 @@ def unjail_server(file: str, jsonpath: list[str]) -> dict:
     parent[jsonpath[-1]] = store.pop(key)["entry"]
     _write_json(path, data)
     _write_json(watch_dir() / "originals.json", store)
-    # The server runs with full rights again, so the event that flagged it is open again.
+    _reopen_unjailed(file, jsonpath)
+    return {"changed": True}
+
+
+def _reopen_unjailed(file: str, jsonpath: list[str]) -> None:
+    """The server runs with full rights again, so the event that flagged it is open again."""
     for e in all_events():
         d = e.get("data") or {}
         if e["kind"] == "mcp_unjailed" and d.get("file") == file and d.get("jsonpath") == list(jsonpath) and e["status"] != "open":
             resolve(e["id"], "open")
-    return {"changed": True}
 
 
 # ------------------------------------------------------------------------------------------- detectors

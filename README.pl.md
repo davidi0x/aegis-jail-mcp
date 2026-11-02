@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="docs/images/demo-live.gif" alt="Prawdziwe nagranie: agent naprawia błąd w sandboxie Aegis, a jego próby kradzieży kluczy i zapisu do ~/.bashrc są powstrzymane" width="80%"><br>
-  <sub>Prawdziwe, nieedytowane nagranie terminala (<code>scripts/demo/</code> generuje je od nowa). Agentem jest prosty skrypt zamiast AI, żeby dało się to powtórzyć bez klucza API.</sub>
+  <sub>Prawdziwe, nieedytowane nagranie terminala. Agentem jest prosty skrypt zamiast AI, żeby dało się to powtórzyć bez klucza API.</sub>
 </p>
 
 <p align="center">
@@ -284,7 +284,7 @@ aegis dashboard         # otwórz lokalny dashboard
 
 Przy każdym przebiegu:
 
-- czyta konfiguracje MCP **Claude Code, Claude Desktop, Cursor, Windsurf, VS Code i Codex** i oznacza serwery, które działają z pełnymi uprawnieniami użytkownika. Po `aegis watch set auto_jail=on` sam zamyka je w `aegis mcp-jail` i zachowuje oryginalny wpis, żeby dało się to cofnąć;
+- czyta konfiguracje MCP **Claude Code, Claude Desktop, Cursor, Windsurf, VS Code i Codex** i oznacza serwery, które działają z pełnymi uprawnieniami użytkownika. Po `aegis watch set auto_jail=on` sam zamyka je w `aegis mcp-jail` i zachowuje oryginalny wpis, żeby dało się to cofnąć (także w `config.toml` Codexa);
 - śledzi logi audytu serwerów w więzieniu: **rug pulle**, zatrute narzędzia, zablokowane wywołania, próby samplingu i wyniesienia sekretów;
 - czyta nowe raporty `aegis run`: **tripwire'y**, zablokowane połączenia, przebiegi czekające na przegląd;
 - skanuje każdy projekt, który Claude Code otwiera po raz pierwszy, w poszukiwaniu ukrytych instrukcji dla AI.
@@ -416,7 +416,7 @@ Tak, możesz używać Aegis w pracy za darmo. AGPL wymaga tylko, żebyś, jeśli
 
 ## Uczciwe ograniczenia
 
-- **Respondery Autopilota:** responder Claude Code jest przetestowany; responder Codex powstał na podstawie dokumentacji CLI Codexa, ale nie był jeszcze testowany od początku do końca. Konfiguracja TOML Codexa jest tylko czytana, nigdy nadpisywana, więc Autopilot pokazuje jego serwery, ale nie zamknie ich za Ciebie.
+- **Respondery Autopilota:** responder Claude Code jest przetestowany od początku do końca; responder Codex powstał na podstawie dokumentacji CLI Codexa, ale nie był jeszcze testowany z samym Codexem (edycja konfiguracji Codexa jest przetestowana). Zamykanie serwerów Codexa w więzieniu wymaga Pythona 3.11 lub nowszego.
 - **Dowód, nie gwarancja.** `optimize` pokazuje, że *te zadania* przechodzą z danym profilem. Agenci są niedeterministyczni, więc używaj `--confirm 2` lub więcej.
 - **Listy hostów działają przez proxy HTTP(S).** Programy ignorujące `HTTPS_PROXY` są blokowane, nie przepuszczane. Zawartość TLS nie jest sprawdzana (wymagałoby to przechwytywania ruchu), więc trzymaj listy krótkie: dozwolony host nadal może odebrać dane.
 - **macOS:** najgroźniejsze usługi Mach są zablokowane, ale nie wszystkie. **Wabiki działają tylko na Linuksie**: macOS i Windows ukrywają prawdziwe pliki zamiast je podmieniać.

@@ -24,3 +24,7 @@ The images in `docs/images/` are generated: terminal screenshots from *real* com
 sudo apt install bubblewrap          # Linux only
 AEGIS_REQUIRE_SANDBOX=1 python3 -m unittest discover -s tests -t . -v
 ```
+
+## Checking the dashboard
+
+`scripts/dev/` has a browser click-through and a readability audit for `aegis dashboard` (see its README). Run them after changing `aegis_jail/web/`.

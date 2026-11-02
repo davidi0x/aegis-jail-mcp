@@ -177,7 +177,6 @@ def _active() -> list[dict]:
 
 def start_run(project: str, agent: str, prompt: str, known: list[str]) -> dict:
     import subprocess
-    import sys
     if project not in known:
         raise ValueError("pick one of the projects Aegis knows about")
     if agent not in {a for a, _, _ in AGENT_INFO}:
@@ -186,18 +185,41 @@ def start_run(project: str, agent: str, prompt: str, known: list[str]) -> dict:
     if not prompt or len(prompt) > 4000:
         raise ValueError("describe the task in a few words (up to 4000 characters)")
     import os
-    log = (watch.watch_dir() / "dashboard-runs.log").open("a", encoding="utf-8")
+    run_log = watch.watch_dir() / f"dashboard-run-{int(time.time())}.log"
+    log = run_log.open("w", encoding="utf-8")
     aegis, extra_env = watch.aegis_invocation()
     env = dict(os.environ)
     if extra_env.get("PYTHONPATH"):
         env["PYTHONPATH"] = os.pathsep.join(x for x in (extra_env["PYTHONPATH"], env.get("PYTHONPATH")) if x)
     proc = subprocess.Popen([*aegis, "run", "--project", project, "--agent", agent, "--prompt", prompt],
                             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, cwd=project, env=env)
+    log.close()  # the child keeps its own copy
     items = _active()
     items.append({"pid": proc.pid, "project": project, "agent": agent, "prompt": prompt[:200], "started": time.time()})
     watch._write_json(watch.watch_dir() / "active.json", items)
+    threading.Thread(target=_watch_run, args=(proc, run_log, project, agent), daemon=True).start()
     return {"ok": True, "message": f"Started {agent} in the sandbox on {Path(project).name}. "
                                    "Its changes wait for your review."}
+
+
+def _watch_run(proc, log_path: Path, project: str, agent: str) -> None:
+    """A run that exits without writing a report never started properly (untrusted task, missing agent, ...).
+    Say so in the dashboard instead of letting it vanish."""
+    code = proc.wait()
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        text = ""
+    if "# Aegis run" in text or code == 0:
+        try:
+            log_path.unlink()
+        except OSError:
+            pass
+        return
+    tail = "\n".join(ln for ln in text.splitlines() if ln.strip())[-700:] or f"exit code {code}"
+    watch.record(watch.Event(id=watch._event_id("run-failed", str(log_path)), kind="autopilot", severity="medium",
+                             title=f"The {agent} run on {Path(project).name} did not start",
+                             detail=tail, source="dashboard", data={"project": project, "agent": agent}))
 
 
 def _setup() -> dict:
@@ -411,7 +433,16 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def start(port: int = 7341) -> tuple[Server, str]:
-    srv = Server(("127.0.0.1", port), Handler)
+    """Listen on 127.0.0.1. A busy preferred port moves on to the next ones (port 0 means "any free port")."""
+    last: OSError | None = None
+    for p in ([0] if port == 0 else range(port, port + 10)):
+        try:
+            srv = Server(("127.0.0.1", p), Handler)
+            break
+        except OSError as e:
+            last = e
+    else:
+        raise last or OSError("no free port")
     srv.token = token()
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{srv.server_address[1]}/?t={srv.token}"
@@ -426,7 +457,11 @@ def main(port: int = 7341, open_browser: bool = True) -> int:
         if open_browser:
             webbrowser.open(url)
         return 0
-    srv, url = start(port)
+    try:
+        srv, url = start(port)
+    except OSError as e:
+        print(f"aegis: could not start the dashboard ({e}). Try another port: aegis dashboard --port 7400")
+        return 1
     print(f"Aegis dashboard: {url}\n(Autopilot is not running in the background; this page checks on demand. "
           "Ctrl+C to stop.)", flush=True)
     if open_browser:

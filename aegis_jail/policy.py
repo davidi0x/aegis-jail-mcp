@@ -21,7 +21,7 @@ import os
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aegis_jail import paths
 
@@ -44,6 +44,9 @@ SAFE_ENV = [
     "PUBLIC", "COMPUTERNAME", "USERDOMAIN", "ProgramW6432", "CommonProgramFiles(x86)",
     "CommonProgramW6432", "DriverData",
 ]
+
+if TYPE_CHECKING:
+    from aegis_jail.sandbox.base import SandboxSpec
 
 
 @dataclass

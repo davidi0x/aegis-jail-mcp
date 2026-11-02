@@ -4,7 +4,5 @@ build/
 dist/
 .venv/
 
-# Remotion video project
-video/node_modules/
-video/out/
-docs/social/_html/
+# Demo videos live outside this repository (see the separate aegis-demo-video folder)
+*.mp4
