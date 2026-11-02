@@ -143,7 +143,8 @@ def cmd_probe(args) -> int:
         if "remount" in str(e):
             hint = ("\nThis usually means the project sits inside a directory the sandbox already mounts, such as "
                     "Python's own install folder. Run the probe on a project somewhere else.")
-        raise SystemExit(f"aegis: the probe could not run: {" ".join(str(e).splitlines()[:2])[:300]}{hint}") from None
+        reason = " ".join(str(e).splitlines()[:2])[:300]
+        raise SystemExit(f"aegis: the probe could not run: {reason}{hint}") from None
     regs = None
     if args.compare:
         prev = previous_probe(project, profile.name, result["run_id"])

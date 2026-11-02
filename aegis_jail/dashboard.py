@@ -10,6 +10,7 @@ Everything the page shows that came from an agent or an MCP server is rendered a
 from __future__ import annotations
 
 import http.server
+import os
 import json
 import secrets
 import socketserver
@@ -428,8 +429,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
-    allow_reuse_address = True
+    # On Windows SO_REUSEADDR lets a second process bind a port that is already in use, which would let
+    # another program sit on the dashboard's port. Take the port exclusively there.
+    allow_reuse_address = os.name != "nt"
     token = ""
+
+    def server_bind(self) -> None:
+        if os.name == "nt":
+            import socket
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)  # type: ignore[attr-defined]
+        super().server_bind()
 
 
 def start(port: int = 7341) -> tuple[Server, str]:
