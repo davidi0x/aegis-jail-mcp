@@ -33,4 +33,4 @@ Issues = "https://github.com/davidi0x/aegis-jail-mcp/issues"
 include = ["aegis_jail*"]
 
 [tool.setuptools.package-data]
-aegis_jail = ["demo/*", "demo/*/*", "demo/.aegis/*", "demo/.aegis/*/*"]
+aegis_jail = ["demo/*", "demo/*/*", "demo/.aegis/*", "demo/.aegis/*/*", "web/*"]

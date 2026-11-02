@@ -105,6 +105,46 @@ def check(event: dict) -> str | None:
     return None
 
 
+def autopilot_context(only_new: bool = False) -> str | None:
+    """Open Autopilot events, phrased for the agent. With only_new, just those not announced yet."""
+    try:
+        from aegis_jail import watch
+        events = watch.open_events("medium")
+        seen_p = watch.watch_dir() / "announced.json"
+        seen = set(json.loads(seen_p.read_text(encoding="utf-8"))) if seen_p.exists() else set()
+    except (OSError, ValueError):
+        return None
+    if only_new:
+        events = [e for e in events if e["id"] not in seen]
+    if not events:
+        return None
+    seen.update(e["id"] for e in events)
+    try:
+        seen_p.write_text(json.dumps(sorted(seen)[-2000:]), encoding="utf-8")
+    except OSError:
+        pass
+    lines = [f"- [{e['severity']}] {e['title']} (event {e['id']})" for e in events[:10]]
+    more = f"\n- ...and {len(events) - 10} more" if len(events) > 10 else ""
+    return ("Aegis Autopilot has open security events on this machine:\n" + "\n".join(lines) + more +
+            "\nTell the user about them briefly. Use the Aegis MCP tools to help: aegis_events for details, "
+            "aegis_jail_mcp_server to contain an MCP server that runs with full user rights, aegis_resolve once "
+            "something is handled. Never re-approve a changed tool or apply a run without the user's explicit yes.")
+
+
+def context_hook(event_name: str, only_new: bool) -> int:
+    """SessionStart / UserPromptSubmit: hand open Autopilot events to the agent as context."""
+    if os.environ.get("AEGIS_HOOK_DISABLE") == "1":
+        return 0
+    try:
+        json.load(sys.stdin)
+    except ValueError:
+        pass
+    text = autopilot_context(only_new=only_new)
+    if text:
+        sys.stdout.write(json.dumps({"hookSpecificOutput": {"hookEventName": event_name, "additionalContext": text}}))
+    return 0
+
+
 def main(stdin=None) -> int:
     if os.environ.get("AEGIS_HOOK_DISABLE") == "1":
         return 0

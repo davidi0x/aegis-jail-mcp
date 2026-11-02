@@ -84,6 +84,8 @@ What happened: the agent "found" keys, but they were **decoys** planted by Aegis
 | 🪤 | **Decoys and tripwires** (Linux) expose hijacked agents with evidence | built in |
 | 👀 | **Review before apply**: risky changes (hooks, CI, `.mcp.json`, scripts) need an explicit yes | `aegis diff` / `apply` |
 | 🔌 | **Claude Code plugin** and **MCP server** for any client | `aegis mcp-server` |
+| 🛰️ | **Autopilot**: watches MCP configs, audit logs, runs and new projects in the background, and hands what it finds to Claude Code or Codex | `aegis watch` |
+| 📊 | **Dashboard**: events, runs and diffs, MCP servers and their audit log, on localhost | `aegis dashboard` |
 | 🤝 | **Share profiles** with your team as plain JSON, with trust-on-first-use | `.aegis/profiles/` |
 
 ## Where can you use it?
@@ -261,7 +263,7 @@ Drop it into any MCP client config (Claude Desktop, Cursor, VS Code, Claude Code
 
 The plugin needs only Python 3. It gives Claude Code:
 
-- the **`aegis` MCP server** with the tools `aegis_run`, `aegis_scan`, `aegis_diff`, `aegis_apply`, `aegis_discard`, `aegis_probe`, `aegis_runs` and `aegis_profiles`. Output from sandboxed code reaches the model fenced as untrusted data, and `aegis_apply` asks **you** directly (MCP elicitation), so an injected model can't approve its own changes;
+- the **`aegis` MCP server** with the tools `aegis_run`, `aegis_scan`, `aegis_diff`, `aegis_apply`, `aegis_discard`, `aegis_probe`, `aegis_runs`, `aegis_profiles`, and the Autopilot tools `aegis_events`, `aegis_jail_mcp_server`, `aegis_resolve` and `aegis_watch_status`. Output from sandboxed code reaches the model fenced as untrusted data, and `aegis_apply` asks **you** directly (MCP elicitation), so an injected model can't approve its own changes;
 - a **guard hook** for normal, unsandboxed sessions: it blocks file and shell access to credential stores (seeing through tricks like `~/.s'sh'` or `$HOME/.ssh`) and blocks any `Bash`, `WebFetch` or MCP call that would carry a credential out;
 - the commands **`/aegis:sandbox <command>`**, **`/aegis:scan`**, **`/aegis:probe`**, **`/aegis:audit`**, and a skill that tells Claude to route untrusted commands through the sandbox.
 
@@ -270,6 +272,38 @@ Use the Aegis tools from **any** MCP client:
 ```json
 { "mcpServers": { "aegis": { "command": "aegis", "args": ["mcp-server"] } } }
 ```
+
+### Autopilot: let your AI clients handle security for you
+
+You should not have to remember to type Aegis commands. Start Autopilot once and it keeps watch in the background:
+
+```bash
+aegis watch install     # systemd (Linux), launchd (macOS) or a scheduled task (Windows), starts at login
+aegis dashboard         # open the local dashboard
+```
+
+On every pass it:
+
+- reads the MCP configs of **Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and Codex** and flags servers that run with your full user rights. With `aegis watch set auto_jail=on` it wraps them in `aegis mcp-jail` itself, keeping the original entry so you can undo it;
+- follows the audit logs of jailed servers: **rug pulls**, poisoned tools, blocked calls, sampling and secret-egress attempts;
+- reads new `aegis run` reports: **tripwires**, blocked connections, runs waiting for review;
+- scans every project Claude Code opens for the first time for hidden instructions aimed at AI.
+
+What it finds goes to your AI client, not only to you:
+
+- the **Claude Code plugin** tells Claude about open events at the start of each session and when new ones appear, so Claude brings them up and handles them with the Aegis MCP tools `aegis_events`, `aegis_jail_mcp_server` and `aegis_resolve`;
+- any MCP client (Codex, Cursor, Claude Desktop) gets the same tools from `aegis mcp-server`;
+- with `aegis watch set responder=claude` (or `codex`), Autopilot starts the agent in the background as soon as something new appears, limited to the Aegis tools. A responder can **contain** a problem (jail a server, discard a run that tripped a wire). It can never **approve** one: re-trusting a changed tool or applying a run always needs you.
+
+<p align="center">
+  <img src="docs/images/dashboard-overview.png" alt="Aegis dashboard: open events, blocked connections, tripwires and jailed MCP servers, with an animated view of the sandbox" width="90%">
+</p>
+
+The dashboard runs on `127.0.0.1` only, behind a per-user token, and shows events, agent runs with their diffs, every MCP server on the machine and its audit log, and the Autopilot settings.
+
+<p align="center">
+  <img src="docs/images/dashboard-mcp.png" alt="Dashboard MCP page: each configured MCP server, whether it runs in the jail, and the audit log" width="90%">
+</p>
 
 ### Scan before you trust
 
@@ -354,6 +388,9 @@ Grants sit on top of a strict base: home directory hidden, credential stores hid
 | `aegis mcp-jail -- <server>` | Run an MCP server sandboxed, with a tool firewall and audit log |
 | `aegis mcp-pins <name> [--reset]` | Show or reset pinned tool definitions |
 | `aegis mcp-server` | Expose Aegis as an MCP server |
+| `aegis watch [install\|status\|set k=v]` | Autopilot: watch in the background, install it as a login service, change settings |
+| `aegis events [--resolve ID]` | List or resolve what Autopilot found |
+| `aegis dashboard` | Open the local dashboard |
 | `aegis windows-setup` | One-time elevated step on Windows for host allowlists |
 | `aegis gc` | Delete stored runs of this project |
 
@@ -417,6 +454,7 @@ Yes, you can use Aegis at work for free. The AGPL asks that if you *modify* it a
 
 ## Honest limits
 
+- **Autopilot responders:** the Claude Code responder is tested; the Codex responder is built from Codex's documented CLI but not yet tested end to end. Codex's TOML config is read, never rewritten, so Autopilot reports its servers but cannot jail them for you.
 - **Evidence, not proof.** `optimize` shows that *these tasks* pass with a profile. Agents are nondeterministic, so use `--confirm 2` or more.
 - **Host allowlists go through an HTTP(S) proxy.** Programs that ignore `HTTPS_PROXY` are blocked, not let through. TLS contents are not inspected (that would mean intercepting your traffic), so keep allowlists small: an allowed host can still receive data.
 - **macOS:** the most dangerous Mach services are blocked, not all of them. **Decoys are Linux-only**: macOS and Windows hide the real files instead of replacing them.

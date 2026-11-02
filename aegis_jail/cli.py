@@ -429,7 +429,72 @@ def cmd_mcp_server(args) -> int:
 
 def cmd_hook(args) -> int:
     from aegis_jail import hook
+    if args.kind == "claude-sessionstart":
+        return hook.context_hook("SessionStart", only_new=False)
+    if args.kind == "claude-promptsubmit":
+        return hook.context_hook("UserPromptSubmit", only_new=True)
     return hook.main()
+
+
+def cmd_watch(args) -> int:
+    from aegis_jail import watch
+    action = args.action or "run"
+    if action == "install":
+        print(watch.install_service())
+        print("Dashboard: http://127.0.0.1:7341 (open it with `aegis dashboard`).")
+        return 0
+    if action == "uninstall":
+        print(watch.uninstall_service())
+        return 0
+    if action == "status":
+        st = watch.status()
+        print(f"Autopilot: {'running' if st['running'] else 'not running'}")
+        print(f"Open events: {st['open']}   MCP servers seen: {st['servers']}")
+        for k, v in st["config"].items():
+            print(f"  {k:12s} {v}")
+        if st["dashboard"]:
+            print(f"Dashboard: {st['dashboard']}")
+        return 0
+    if action == "set":
+        updates = {}
+        for kv in args.settings:
+            k, _, v = kv.partition("=")
+            low = v.strip().lower()
+            updates[k.strip()] = True if low in ("true", "on", "yes") else False if low in ("false", "off", "no") else v
+        for k, v in watch.save_config(updates).items():
+            print(f"  {k:12s} {v}")
+        return 0
+    if args.once or action == "once":
+        new = watch.scan_once()
+        for ev in new:
+            print(f"[{ev.severity}] {ev.title}")
+        print(f"{len(new)} new event(s); {len(watch.open_events())} open.")
+        return 0
+    return watch.run_forever(None if args.no_dashboard else args.port)
+
+
+def cmd_events(args) -> int:
+    from aegis_jail import watch
+    if args.resolve:
+        e = watch.resolve(args.resolve, "ignored" if args.ignore else "resolved", args.note or "", by="cli")
+        print(f"Event {e['id']} is now {e['status']}.")
+        return 0
+    if args.act:
+        event_id, _, action = args.act.partition(":")
+        print(watch.act(event_id, action, by="cli")["message"])
+        return 0
+    evs = watch.all_events() if args.all else watch.open_events()
+    if not evs:
+        print("No open events.")
+    for e in evs:
+        acts = f"  [{', '.join(e['actions'])}]" if e.get("actions") else ""
+        print(f"{e['id']}  {e['severity']:6s} {e['status']:8s} {e['title']}{acts}")
+    return 0
+
+
+def cmd_dashboard(args) -> int:
+    from aegis_jail import dashboard
+    return dashboard.main(port=args.port, open_browser=not args.no_open)
 
 
 def cmd_windows_setup(args) -> int:
@@ -565,8 +630,30 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_mcp_server)
 
     p = sub.add_parser("hook", help="Claude Code PreToolUse guard (used by the plugin)")
-    p.add_argument("kind", choices=["claude-pretooluse"])
+    p.add_argument("kind", choices=["claude-pretooluse", "claude-sessionstart", "claude-promptsubmit"])
     p.set_defaults(fn=cmd_hook)
+
+    p = sub.add_parser("watch", help="Autopilot: watch MCP configs, audit logs and runs in the background")
+    p.add_argument("action", nargs="?", choices=["run", "once", "status", "install", "uninstall", "set"],
+                   help="run (default), once, status, install / uninstall the background service, set key=value")
+    p.add_argument("settings", nargs="*", help="for `set`: auto_jail=on notify=off responder=claude interval=10")
+    p.add_argument("--once", action="store_true", help="one pass, then exit")
+    p.add_argument("--port", type=int, default=7341, help="dashboard port (default 7341)")
+    p.add_argument("--no-dashboard", action="store_true", help="do not serve the dashboard")
+    p.set_defaults(fn=cmd_watch)
+
+    p = sub.add_parser("events", help="list / resolve the security events found by Autopilot")
+    p.add_argument("--all", action="store_true", help="include resolved and ignored events")
+    p.add_argument("--resolve", metavar="ID", help="mark an event resolved")
+    p.add_argument("--ignore", action="store_true", help="with --resolve: mark it ignored instead")
+    p.add_argument("--note", help="with --resolve: what was done")
+    p.add_argument("--act", metavar="ID:ACTION", help="run an event's action, e.g. 3fa2c1:jail")
+    p.set_defaults(fn=cmd_events)
+
+    p = sub.add_parser("dashboard", help="open the local dashboard (served by Autopilot, or started here)")
+    p.add_argument("--port", type=int, default=7341)
+    p.add_argument("--no-open", action="store_true", help="do not open a browser")
+    p.set_defaults(fn=cmd_dashboard)
 
     p = sub.add_parser("windows-setup", help="one-time elevated setup for domain allowlists on Windows")
     p.set_defaults(fn=cmd_windows_setup)

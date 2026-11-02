@@ -84,6 +84,8 @@ Co się stało: agent „znalazł" klucze, ale to były **wabiki** podłożone p
 | 🪤 | **Wabiki i alarmy** (Linux) ujawniają przejętego agenta z dowodem | wbudowane |
 | 👀 | **Przegląd przed zastosowaniem**: ryzykowne zmiany (hooki, CI, `.mcp.json`, skrypty) wymagają wyraźnej zgody | `aegis diff` / `apply` |
 | 🔌 | **Wtyczka Claude Code** i **serwer MCP** dla dowolnego klienta | `aegis mcp-server` |
+| 🛰️ | **Autopilot**: pilnuje w tle konfiguracji MCP, logów audytu, przebiegów i nowych projektów, a to, co znajdzie, przekazuje Claude Code lub Codexowi | `aegis watch` |
+| 📊 | **Dashboard**: zdarzenia, przebiegi z diffami, serwery MCP i ich log audytu, na localhost | `aegis dashboard` |
 | 🤝 | **Wspólne profile** w zespole jako zwykły JSON, z zaufaniem przy pierwszym użyciu | `.aegis/profiles/` |
 
 ## Gdzie można go używać?
@@ -271,6 +273,38 @@ Narzędzi Aegis możesz użyć z **dowolnego** klienta MCP:
 { "mcpServers": { "aegis": { "command": "aegis", "args": ["mcp-server"] } } }
 ```
 
+### Autopilot: niech klient AI pilnuje bezpieczeństwa za Ciebie
+
+Nie musisz pamiętać o wpisywaniu komend Aegis. Włącz Autopilota raz, a będzie czuwał w tle:
+
+```bash
+aegis watch install     # systemd (Linux), launchd (macOS) lub zadanie harmonogramu (Windows), start przy logowaniu
+aegis dashboard         # otwórz lokalny dashboard
+```
+
+Przy każdym przebiegu:
+
+- czyta konfiguracje MCP **Claude Code, Claude Desktop, Cursor, Windsurf, VS Code i Codex** i oznacza serwery, które działają z pełnymi uprawnieniami użytkownika. Po `aegis watch set auto_jail=on` sam zamyka je w `aegis mcp-jail` i zachowuje oryginalny wpis, żeby dało się to cofnąć;
+- śledzi logi audytu serwerów w więzieniu: **rug pulle**, zatrute narzędzia, zablokowane wywołania, próby samplingu i wyniesienia sekretów;
+- czyta nowe raporty `aegis run`: **tripwire'y**, zablokowane połączenia, przebiegi czekające na przegląd;
+- skanuje każdy projekt, który Claude Code otwiera po raz pierwszy, w poszukiwaniu ukrytych instrukcji dla AI.
+
+To, co znajdzie, trafia do Twojego klienta AI, nie tylko do Ciebie:
+
+- **wtyczka Claude Code** mówi Claude'owi o otwartych zdarzeniach na starcie sesji i gdy pojawią się nowe, więc Claude sam o nich wspomina i obsługuje je narzędziami MCP Aegis `aegis_events`, `aegis_jail_mcp_server` i `aegis_resolve`;
+- każdy klient MCP (Codex, Cursor, Claude Desktop) dostaje te same narzędzia z `aegis mcp-server`;
+- po `aegis watch set responder=claude` (albo `codex`) Autopilot uruchamia agenta w tle, gdy tylko pojawi się coś nowego, z dostępem wyłącznie do narzędzi Aegis. Responder może problem **powstrzymać** (zamknąć serwer w więzieniu, odrzucić przebieg z tripwire'em). Nigdy nie może niczego **zatwierdzić**: ponowne zaufanie zmienionemu narzędziu i zastosowanie zmian zawsze wymagają Ciebie.
+
+<p align="center">
+  <img src="docs/images/dashboard-overview.png" alt="Dashboard Aegis: otwarte zdarzenia, zablokowane połączenia, tripwire'y i serwery MCP w więzieniu, z animowanym widokiem piaskownicy" width="90%">
+</p>
+
+Dashboard działa tylko na `127.0.0.1`, za tokenem użytkownika, i pokazuje zdarzenia, przebiegi agentów z diffami, wszystkie serwery MCP na komputerze z logiem audytu oraz ustawienia Autopilota.
+
+<p align="center">
+  <img src="docs/images/dashboard-mcp.png" alt="Strona MCP w dashboardzie: każdy skonfigurowany serwer MCP, czy działa w więzieniu, i log audytu" width="90%">
+</p>
+
 ### Skanuj, zanim zaufasz
 
 <p align="center">
@@ -382,6 +416,7 @@ Tak, możesz używać Aegis w pracy za darmo. AGPL wymaga tylko, żebyś, jeśli
 
 ## Uczciwe ograniczenia
 
+- **Respondery Autopilota:** responder Claude Code jest przetestowany; responder Codex powstał na podstawie dokumentacji CLI Codexa, ale nie był jeszcze testowany od początku do końca. Konfiguracja TOML Codexa jest tylko czytana, nigdy nadpisywana, więc Autopilot pokazuje jego serwery, ale nie zamknie ich za Ciebie.
 - **Dowód, nie gwarancja.** `optimize` pokazuje, że *te zadania* przechodzą z danym profilem. Agenci są niedeterministyczni, więc używaj `--confirm 2` lub więcej.
 - **Listy hostów działają przez proxy HTTP(S).** Programy ignorujące `HTTPS_PROXY` są blokowane, nie przepuszczane. Zawartość TLS nie jest sprawdzana (wymagałoby to przechwytywania ruchu), więc trzymaj listy krótkie: dozwolony host nadal może odebrać dane.
 - **macOS:** najgroźniejsze usługi Mach są zablokowane, ale nie wszystkie. **Wabiki działają tylko na Linuksie**: macOS i Windows ukrywają prawdziwe pliki zamiast je podmieniać.

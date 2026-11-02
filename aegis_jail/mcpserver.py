@@ -87,6 +87,44 @@ TOOLS: list[dict[str, Any]] = [
         "inputSchema": {"type": "object", "properties": {"project": _PROJECT}},
         "annotations": {"title": "List profiles", "readOnlyHint": True},
     },
+    {
+        "name": "aegis_events",
+        "description": ("List the security events Aegis Autopilot (`aegis watch`) detected on this machine: MCP servers "
+                        "running with full user rights, rug pulls and poisoned tools, blocked tool calls, tripwires, "
+                        "blocked connections, risky projects. Call this when a session starts or the user asks about "
+                        "security, then help the user deal with each open event."),
+        "inputSchema": {"type": "object", "properties": {
+            "status": {"type": "string", "enum": ["open", "all"], "description": "Default 'open'."},
+            "min_severity": {"type": "string", "enum": ["info", "medium", "high"], "description": "Default 'info'."},
+            "refresh": {"type": "boolean", "description": "Run the detectors once before listing (default true)."}}},
+        "annotations": {"title": "Security events", "readOnlyHint": True},
+    },
+    {
+        "name": "aegis_jail_mcp_server",
+        "description": ("Contain an MCP server that runs with full user rights: rewrite its entry in the client's MCP "
+                        "config so it starts through `aegis mcp-jail` (sandboxed, tool firewall, audit log). A backup "
+                        "is kept and the change can be undone from the dashboard. Pass the event id of an "
+                        "'mcp_unjailed' event."),
+        "inputSchema": {"type": "object", "properties": {"event": {"type": "string", "description": "Event id."}},
+                        "required": ["event"]},
+        "annotations": {"title": "Jail an MCP server", "idempotentHint": True},
+    },
+    {
+        "name": "aegis_resolve",
+        "description": ("Mark a security event as resolved (dealt with) or ignored (accepted risk), with a short note "
+                        "saying what was done. Only resolve what was actually handled."),
+        "inputSchema": {"type": "object", "properties": {
+            "event": {"type": "string", "description": "Event id."},
+            "status": {"type": "string", "enum": ["resolved", "ignored"], "description": "Default 'resolved'."},
+            "note": {"type": "string", "description": "What was done, in one line."}}, "required": ["event", "note"]},
+        "annotations": {"title": "Resolve event"},
+    },
+    {
+        "name": "aegis_watch_status",
+        "description": "Show whether Aegis Autopilot is running in the background, its settings and the dashboard URL.",
+        "inputSchema": {"type": "object", "properties": {}},
+        "annotations": {"title": "Autopilot status", "readOnlyHint": True},
+    },
 ]
 
 
@@ -245,10 +283,56 @@ def tool_scan(args: dict) -> str:
     return untrusted(scan.render(scan.scan(root), root), "aegis scan findings (quotes file contents)")
 
 
+def _fmt_event(e: dict) -> str:
+    acts = f"  actions: {', '.join(e['actions'])}" if e.get("actions") else ""
+    d = e.get("data") or {}
+    if d.get("run"):
+        acts += f"  (project {d.get('project')}, run {d['run']})"
+    return (f"- [{e['severity'].upper()}] {e['title']}  (id {e['id']}, {e['status']}){acts}\n"
+            + "\n".join(f"    {line}" for line in str(e.get("detail", "")).splitlines()[:6]))
+
+
+def tool_events(args: dict) -> str:
+    from aegis_jail import watch
+    if args.get("refresh", True):
+        watch.scan_once()
+    evs = watch.all_events() if args.get("status") == "all" else watch.open_events(args.get("min_severity") or "info")
+    if not evs:
+        return "No open security events. Aegis Autopilot found nothing that needs attention."
+    return f"{len(evs)} event(s):\n" + "\n".join(_fmt_event(e) for e in evs[:40])
+
+
+def tool_jail_server(args: dict) -> str:
+    from aegis_jail import watch
+    res = watch.act(args["event"], "jail", by="agent")
+    return res["message"] + (f" Backup: {res['backup']}" if res.get("backup") else "")
+
+
+def tool_resolve(args: dict) -> str:
+    from aegis_jail import watch
+    e = watch.resolve(args["event"], args.get("status") or "resolved", args.get("note", ""), by="agent")
+    return f"Event {e['id']} is now {e['status']}."
+
+
+def tool_watch_status(args: dict) -> str:
+    from aegis_jail import watch
+    st = watch.status()
+    lines = [f"Autopilot: {'running' if st['running'] else 'not running'}" + (f" (pid {st['pid']})" if st["pid"] else ""),
+             f"Open events: {st['open']}", f"MCP servers seen: {st['servers']}",
+             f"Settings: {json.dumps(st['config'])}"]
+    if st["dashboard"]:
+        lines.append(f"Dashboard: {st['dashboard']}")
+    if not st["running"]:
+        lines.append("Start it with `aegis watch` or install it as a background service with `aegis watch install`.")
+    return "\n".join(lines)
+
+
 HANDLERS: dict[str, Callable[[dict], str]] = {
     "aegis_scan": tool_scan,
     "aegis_run": tool_run, "aegis_probe": tool_probe, "aegis_runs": tool_runs, "aegis_diff": tool_diff,
     "aegis_apply": tool_apply, "aegis_discard": tool_discard, "aegis_profiles": tool_profiles,
+    "aegis_events": tool_events, "aegis_jail_mcp_server": tool_jail_server, "aegis_resolve": tool_resolve,
+    "aegis_watch_status": tool_watch_status,
 }
 
 
@@ -329,7 +413,9 @@ def handle(msg: dict) -> dict | None:
                 "instructions": ("Use aegis_run to execute shell commands (tests, builds, untrusted scripts) in a "
                                  "sandbox that hides the user's home directory and credentials and blocks network "
                                  "access unless allowed. Changes land in a working copy; show aegis_diff to the "
-                                 "user and only aegis_apply after they agree."),
+                                 "user and only aegis_apply after they agree. Aegis Autopilot watches this machine in the "
+                                 "background: call aegis_events early in a session and help the user handle open "
+                                 "security events (aegis_jail_mcp_server contains a risky MCP server)."),
             }
         elif method == "ping":
             result = {}

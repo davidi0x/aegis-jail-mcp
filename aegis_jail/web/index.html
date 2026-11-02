@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aegis Jail MCP</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 22V11a9 9 0 0 1 18 0v11h-6v-8a3 3 0 0 0-6 0v8z' fill='%231d2722'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#overview" aria-label="Aegis Jail MCP, overview">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22V11a9 9 0 0 1 18 0v11h-6v-8a3 3 0 0 0-6 0v8z"/></svg>
+      <span class="brand-text"><b>aegis</b><small>JAIL MCP</small></span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#overview" data-page="overview">Overview</a>
+      <a href="#activity" data-page="activity">Activity <span class="tab-count" id="tab-open" hidden></span></a>
+      <a href="#runs" data-page="runs">Agent runs</a>
+      <a href="#mcp" data-page="mcp">MCP servers</a>
+      <a href="#boundaries" data-page="boundaries">Boundaries</a>
+      <a href="#autopilot" data-page="autopilot">Autopilot</a>
+      <a href="#setup" data-page="setup">Setup</a>
+    </nav>
+    <div class="top-status">
+      <span class="pill" id="pill-autopilot"><i class="dot"></i><span>Checking</span></span>
+      <button class="icon-btn" id="btn-refresh" type="button" aria-label="Check now" title="Check now">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <!-- ============================================================== overview -->
+  <section class="page" id="page-overview">
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Your agent security workspace</p>
+        <h1>Overview</h1>
+        <p class="sub">What your agents could do, what they tried, and what Aegis stopped.</p>
+      </div>
+      <div class="head-meta" id="ov-meta"></div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow on-dark">Autopilot</p>
+        <h2 class="hero-title">Your agents work<br>Aegis keeps watch</h2>
+        <p class="hero-text">It checks your MCP servers, agent runs and new projects in the background. When it finds something, Claude Code or Codex can contain it through the Aegis MCP tools, and you decide anything that needs a yes.</p>
+        <div class="hero-actions">
+          <a class="btn btn-light" href="#activity">Open activity</a>
+          <button class="btn btn-outline-light copy" type="button" data-copy="aegis watch install">Copy: aegis watch install</button>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true" data-art="rings"></div>
+    </div>
+
+    <div class="tiles" id="ov-tiles"></div>
+
+    <div class="cols">
+      <div class="panel">
+        <div class="panel-head"><h3>Needs attention</h3><a class="link" href="#activity">All activity</a></div>
+        <div id="ov-events" class="stack"></div>
+      </div>
+      <div class="stack">
+        <div class="panel">
+          <div class="panel-head"><h3>Recent runs</h3><a class="link" href="#runs">All runs</a></div>
+          <div id="ov-runs" class="list"></div>
+        </div>
+        <div class="panel panel-dark">
+          <p class="eyebrow on-dark">Your terminal</p>
+          <h3 class="on-dark-title">Run any agent inside the boundary</h3>
+          <pre class="term"><span class="prompt">$</span> aegis run --agent claude-code --prompt "Fix the failing test"
+<span class="muted"># a copy of the project, keys hidden, network off</span>
+<span class="prompt">$</span> aegis diff &amp;&amp; aegis apply</pre>
+          <button class="btn btn-outline-light btn-sm copy" type="button" data-copy='aegis run --agent claude-code --prompt "Fix the failing test"'>Copy command</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== activity -->
+  <section class="page" id="page-activity" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Live</p>
+        <h1>Activity</h1>
+        <p class="sub">Everything Autopilot found, newest first. It updates as it happens.</p>
+      </div>
+      <div class="segmented" role="tablist" aria-label="Filter">
+        <button type="button" role="tab" data-filter="open" aria-selected="true">Open</button>
+        <button type="button" role="tab" data-filter="high">High</button>
+        <button type="button" role="tab" data-filter="all">All</button>
+      </div>
+    </div>
+    <div id="act-list" class="stack"></div>
+  </section>
+
+  <!-- ============================================================== runs -->
+  <section class="page" id="page-runs" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Sandboxed sessions</p>
+        <h1>Agent runs</h1>
+        <p class="sub">Each run works on a copy of the project. Nothing reaches your files until you apply it.</p>
+      </div>
+    </div>
+    <div class="panel flush">
+      <div class="table-scroll">
+        <table class="table" id="runs-table">
+          <thead><tr><th>Run</th><th>Project</th><th>Agent</th><th>Result</th><th>Blocked</th><th>Changes</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="runs-empty" class="empty" hidden></div>
+    </div>
+  </section>
+
+  <!-- ============================================================== mcp -->
+  <section class="page" id="page-mcp" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Tool firewall</p>
+        <h1>MCP servers</h1>
+        <p class="sub">Every MCP server your AI clients start, and whether it runs inside the jail.</p>
+      </div>
+    </div>
+    <div class="flow-card">
+      <div class="flow-art" aria-hidden="true" data-art="flow"></div>
+      <ul class="flow-notes">
+        <li><b>Pinned on first use.</b> A tool that changes later is hidden until you review it.</li>
+        <li><b>Poisoned descriptions filtered.</b> Instructions aimed at the AI never reach it.</li>
+        <li><b>No secrets out.</b> Calls that carry a credential are stopped and logged.</li>
+      </ul>
+    </div>
+    <div id="mcp-servers" class="stack"></div>
+    <div class="panel flush">
+      <div class="panel-head pad"><h3>Audit log</h3><span class="muted small" id="mcp-act-count"></span></div>
+      <div class="table-scroll">
+        <table class="table" id="mcp-activity"><thead><tr><th>Time</th><th>Server</th><th>Event</th><th>Detail</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="mcp-act-empty" class="empty" hidden></div>
+    </div>
+  </section>
+
+  <!-- ============================================================== boundaries -->
+  <section class="page" id="page-boundaries" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">The permission model</p>
+        <h1>Boundaries</h1>
+        <p class="sub">Agent freedom inside a deliberate, limited workspace.</p>
+      </div>
+      <button class="btn btn-ghost copy" type="button" data-copy="aegis probe">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+        Copy: aegis probe
+      </button>
+    </div>
+    <div class="hero hero-tall">
+      <div class="hero-copy">
+        <p class="eyebrow on-dark">Your control, your <span class="sage">rules</span></p>
+        <h2 class="hero-title big">Big power<br>Small permissions</h2>
+        <p class="hero-text">Isolation is enforced by the operating system (<span id="b-backend">sandbox</span>), not by asking the AI to behave.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true" data-art="rings"></div>
+    </div>
+    <div class="cards4">
+      <article class="card tint-sage">
+        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"/></svg>
+        <h3>Project copy</h3>
+        <p>The agent works on a separate copy of the project. You review the changes before they reach your files.</p>
+      </article>
+      <article class="card tint-signal">
+        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+        <h3>Network allowlist</h3>
+        <p>Profiles list the hosts an agent may reach. Everything else is refused, and <code>aegis probe</code> shows what really holds.</p>
+      </article>
+      <article class="card tint-rose">
+        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <h3>Private by default</h3>
+        <p>Your home directory, SSH and cloud keys, tokens and <code>.env</code> files stay out of reach unless you expose them.</p>
+      </article>
+      <article class="card tint-moss">
+        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>
+        <h3>Human in control</h3>
+        <p><code>aegis diff</code> and <code>aegis apply</code> decide what reaches the original project. Risky files need an explicit yes.</p>
+      </article>
+    </div>
+    <div class="footnote-row">
+      <p class="footnote">This is a model of how Aegis works, not a live certificate. Run <code>aegis probe</code> to test it on this machine.</p>
+      <a class="link" href="https://github.com/davidi0x/aegis-jail-mcp/blob/main/docs/THREAT_MODEL.md" target="_blank" rel="noopener">Read the threat model</a>
+    </div>
+  </section>
+
+  <!-- ============================================================== autopilot -->
+  <section class="page" id="page-autopilot" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Runs in the background</p>
+        <h1>Autopilot</h1>
+        <p class="sub">Decide what Aegis does on its own and which agent handles what it finds.</p>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="panel">
+        <div class="panel-head"><h3>What Autopilot does</h3><span class="pill" id="ap-pill"><i class="dot"></i><span></span></span></div>
+        <form id="ap-form" class="settings">
+          <label class="setting" for="set-auto_jail">
+            <span><b>Jail new MCP servers automatically</b><small>When a client config gains a server that runs with your full rights, wrap it in <code>aegis mcp-jail</code>. The original entry is kept and can be restored.</small></span>
+            <input type="checkbox" class="switch" id="set-auto_jail" data-key="auto_jail">
+          </label>
+          <label class="setting" for="set-notify">
+            <span><b>Desktop notifications</b><small>For medium and high events.</small></span>
+            <input type="checkbox" class="switch" id="set-notify" data-key="notify">
+          </label>
+          <label class="setting" for="set-scan_projects">
+            <span><b>Scan new projects</b><small>The first time Claude Code opens a folder, look for hidden instructions aimed at AI, auto-running hooks and secrets.</small></span>
+            <input type="checkbox" class="switch" id="set-scan_projects" data-key="scan_projects">
+          </label>
+          <label class="setting" for="set-responder">
+            <span><b>Agent that responds</b><small>Started in the background when something new appears, limited to the Aegis MCP tools.</small></span>
+            <select id="set-responder" data-key="responder">
+              <option value="">Off, I handle events</option>
+              <option value="claude">Claude Code</option>
+              <option value="codex">Codex (OpenAI)</option>
+            </select>
+          </label>
+          <label class="setting" for="set-interval">
+            <span><b>Check every</b><small>Seconds between passes.</small></span>
+            <select id="set-interval" data-key="interval">
+              <option value="3">3 s</option><option value="5">5 s</option><option value="15">15 s</option><option value="60">1 min</option>
+            </select>
+          </label>
+        </form>
+      </div>
+      <div class="stack">
+        <div class="panel">
+          <h3>A responder can contain, never approve</h3>
+          <ul class="checks">
+            <li class="yes">Jail an MCP server that runs with full rights</li>
+            <li class="yes">Discard a run that tripped a wire</li>
+            <li class="yes">Mark what it handled, with a note you can read here</li>
+            <li class="no">Re-trust a tool whose definition changed</li>
+            <li class="no">Apply an agent's changes to your project</li>
+          </ul>
+        </div>
+        <div class="panel panel-dark">
+          <p class="eyebrow on-dark">Keep it running</p>
+          <h3 class="on-dark-title">Start Autopilot at login</h3>
+          <pre class="term"><span class="prompt">$</span> aegis watch install</pre>
+          <p class="on-dark-muted small">systemd on Linux, launchd on macOS, a scheduled task on Windows. Remove it with <code>aegis watch uninstall</code>.</p>
+          <button class="btn btn-outline-light btn-sm copy" type="button" data-copy="aegis watch install">Copy command</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== setup -->
+  <section class="page" id="page-setup" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Quick start</p>
+        <h1>Setup</h1>
+        <p class="sub">Four steps, then your AI clients use Aegis without you typing commands.</p>
+      </div>
+    </div>
+    <ol class="steps">
+      <li class="panel">
+        <h3>Install Aegis</h3>
+        <p>Python 3.10 or newer, no dependencies.</p>
+        <div class="cmd"><code>pip install git+https://github.com/davidi0x/aegis-jail-mcp</code><button class="btn btn-ghost btn-sm copy" type="button" data-copy="pip install git+https://github.com/davidi0x/aegis-jail-mcp">Copy</button></div>
+      </li>
+      <li class="panel">
+        <h3>Start Autopilot in the background</h3>
+        <p>It watches your MCP configs, runs and projects, and serves this dashboard.</p>
+        <div class="cmd"><code>aegis watch install</code><button class="btn btn-ghost btn-sm copy" type="button" data-copy="aegis watch install">Copy</button></div>
+      </li>
+      <li class="panel">
+        <h3>Give Claude Code the Aegis tools</h3>
+        <p>The plugin adds the Aegis MCP server, a guard that keeps credentials out of reach, and hooks that tell Claude about open events at the start of each session.</p>
+        <div class="cmd"><code>claude plugin marketplace add davidi0x/aegis-jail-mcp &amp;&amp; claude plugin install aegis@aegis</code><button class="btn btn-ghost btn-sm copy" type="button" data-copy="claude plugin marketplace add davidi0x/aegis-jail-mcp && claude plugin install aegis@aegis">Copy</button></div>
+      </li>
+      <li class="panel">
+        <h3>Give Codex (OpenAI) the Aegis tools</h3>
+        <p>Add the Aegis MCP server to <code>~/.codex/config.toml</code>. Any other MCP client works the same way: it starts <code>aegis mcp-server</code>.</p>
+        <div class="cmd"><code>[mcp_servers.aegis]<br>command = "aegis"<br>args = ["mcp-server"]</code><button class="btn btn-ghost btn-sm copy" type="button" data-copy='[mcp_servers.aegis]
+command = "aegis"
+args = ["mcp-server"]'>Copy</button></div>
+      </li>
+    </ol>
+  </section>
+</main>
+
+<aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="drawer-title">
+  <div class="drawer-panel">
+    <div class="drawer-head">
+      <h2 id="drawer-title">Run</h2>
+      <button class="icon-btn" type="button" id="drawer-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</aside>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<template id="tpl-rings">
+<svg class="art-rings" viewBox="0 0 480 392" role="img" aria-label="An agent inside the Aegis sandbox, inside your machine. Allowed traffic leaves, the rest is stopped at the sandbox wall.">
+  <defs>
+    <radialGradient id="g-core" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="var(--art-core-hi)"/><stop offset="1" stop-color="var(--art-core)"/></radialGradient>
+    <radialGradient id="g-sandbox" cx="50%" cy="50%" r="50%"><stop offset=".55" stop-color="var(--art-sandbox)" stop-opacity=".0"/><stop offset="1" stop-color="var(--art-sandbox)" stop-opacity=".55"/></radialGradient>
+  </defs>
+  <circle cx="240" cy="190" r="150" fill="var(--art-host)"/>
+  <circle class="spin" cx="240" cy="190" r="150" fill="none" stroke="var(--art-line)" stroke-width="1.5" stroke-dasharray="3 7"/>
+  <text x="240" y="62" text-anchor="middle" class="art-label">Host machine</text>
+  <circle cx="240" cy="190" r="100" fill="url(#g-sandbox)" stroke="var(--art-ring)" stroke-width="1.5"/>
+  <circle cx="240" cy="190" r="100" fill="none" stroke="var(--art-ring)" stroke-width="2" opacity="0">
+    <animate attributeName="r" values="100;118" dur="3.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values=".55;0" dur="3.2s" repeatCount="indefinite"/>
+  </circle>
+  <text x="240" y="116" text-anchor="middle" class="art-label">Aegis sandbox</text>
+  <circle cx="240" cy="198" r="54" fill="url(#g-core)"/>
+  <path d="M226 206v-12a14 14 0 0 1 28 0v12h-8v-10a6 6 0 0 0-12 0v10z" fill="var(--art-mark)"/>
+  <text x="240" y="228" text-anchor="middle" class="art-core-label">Your agent</text>
+
+  <!-- allowed: leaves through the sandbox to an allowed host -->
+  <g class="node"><circle cx="430" cy="72" r="7" fill="var(--art-ok)"/><text x="430" y="96" text-anchor="middle" class="art-small">allowed host</text></g>
+  <circle opacity="0" r="4.5" fill="var(--art-ok)"><animateMotion dur="3.6s" repeatCount="indefinite" path="M270 168 Q350 110 424 76" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.85;1" dur="3.6s" repeatCount="indefinite"/></circle>
+  <circle opacity="0" r="4.5" fill="var(--art-ok)"><animateMotion dur="3.6s" begin="1.8s" repeatCount="indefinite" path="M270 168 Q350 110 424 76" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines=".4 0 .2 1"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.85;1" dur="3.6s" begin="1.8s" repeatCount="indefinite"/></circle>
+
+  <!-- blocked: stopped at the sandbox wall -->
+  <g class="blocked">
+    <circle opacity="0" r="4.5" fill="var(--art-stop)"><animateMotion dur="2.8s" begin=".6s" repeatCount="indefinite" path="M204 236 L168 262" keyPoints="0;1;1" keyTimes="0;.55;1" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.7;1" dur="2.8s" begin=".6s" repeatCount="indefinite"/></circle>
+    <circle cx="168" cy="262" r="6" fill="none" stroke="var(--art-stop)" stroke-width="2" opacity="0"><animate attributeName="r" values="4;14" keyTimes="0;1" dur="2.8s" begin="2.14s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;0" dur="2.8s" begin="2.14s" repeatCount="indefinite"/></circle>
+    <circle opacity="0" r="4.5" fill="var(--art-stop)"><animateMotion dur="3.4s" begin="1.2s" repeatCount="indefinite" path="M188 184 L142 176" keyPoints="0;1;1" keyTimes="0;.55;1" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.7;1" dur="3.4s" begin="1.2s" repeatCount="indefinite"/></circle>
+    <circle cx="142" cy="176" r="6" fill="none" stroke="var(--art-stop)" stroke-width="2" opacity="0"><animate attributeName="r" values="4;14" dur="3.4s" begin="3.07s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;0" dur="3.4s" begin="3.07s" repeatCount="indefinite"/></circle>
+    <circle opacity="0" r="4.5" fill="var(--art-stop)"><animateMotion dur="3s" begin="2.2s" repeatCount="indefinite" path="M272 240 L300 278" keyPoints="0;1;1" keyTimes="0;.55;1" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.7;1" dur="3s" begin="2.2s" repeatCount="indefinite"/></circle>
+    <circle cx="300" cy="278" r="6" fill="none" stroke="var(--art-stop)" stroke-width="2" opacity="0"><animate attributeName="r" values="4;14" dur="3s" begin="3.85s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;0" dur="3s" begin="3.85s" repeatCount="indefinite"/></circle>
+  </g>
+  <g class="legend">
+    <circle cx="150" cy="374" r="4.5" fill="var(--art-ok)"/><text x="162" y="378" class="art-small">allowed</text>
+    <circle cx="232" cy="374" r="4.5" fill="var(--art-stop)"/><text x="244" y="378" class="art-small">stopped at the wall</text>
+  </g>
+</svg>
+</template>
+
+<template id="tpl-flow">
+<svg class="art-flow" viewBox="0 0 680 230" role="img" aria-label="The MCP client talks to the server only through aegis mcp-jail. A changed tool is stopped at the jail.">
+  <g class="box"><rect x="16" y="70" width="168" height="76" rx="14" fill="var(--flow-box)" stroke="var(--flow-line)"/><text x="100" y="104" text-anchor="middle" class="flow-title">AI client</text><text x="100" y="126" text-anchor="middle" class="flow-sub">Claude Code, Codex</text></g>
+  <g class="box"><rect x="256" y="52" width="168" height="112" rx="16" fill="var(--flow-jail)"/><path d="M325 98v-10a15 15 0 0 1 30 0v10h-8v-8a7 7 0 0 0-14 0v8z" fill="var(--flow-mark)"/><text x="340" y="126" text-anchor="middle" class="flow-title on-jail">aegis mcp-jail</text><text x="340" y="146" text-anchor="middle" class="flow-sub on-jail">pins · filters · logs</text></g>
+  <g class="box"><rect x="496" y="70" width="168" height="76" rx="14" fill="var(--flow-box)" stroke="var(--flow-line)"/><text x="580" y="104" text-anchor="middle" class="flow-title">MCP server</text><text x="580" y="126" text-anchor="middle" class="flow-sub">sandboxed process</text></g>
+  <path d="M184 100H256M424 100H496" stroke="var(--flow-line)" stroke-width="2" stroke-dasharray="4 6"/>
+  <path d="M496 120H424M256 120H184" stroke="var(--flow-line)" stroke-width="2" stroke-dasharray="4 6"/>
+  <circle opacity="0" r="5" fill="var(--art-ok)"><animateMotion dur="3.2s" repeatCount="indefinite" path="M184 100H496" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" repeatCount="indefinite"/></circle>
+  <circle opacity="0" r="5" fill="var(--art-ok)"><animateMotion dur="3.2s" begin="1.6s" repeatCount="indefinite" path="M496 120H184" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" begin="1.6s" repeatCount="indefinite"/></circle>
+  <circle opacity="0" r="5" fill="var(--art-stop)"><animateMotion dur="4s" begin=".8s" repeatCount="indefinite" path="M496 120H426" keyPoints="0;1;1" keyTimes="0;.45;1" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.06;.75;1" dur="4s" begin=".8s" repeatCount="indefinite"/></circle>
+  <g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;.44;.5;.8;1" dur="4s" begin=".8s" repeatCount="indefinite"/><rect x="430" y="168" width="234" height="34" rx="17" fill="var(--flow-stop-bg)"/><text x="547" y="190" text-anchor="middle" class="flow-stop">changed tool: hidden, logged</text></g>
+</svg>
+</template>
+
+<template id="tpl-flow-v">
+<svg class="art-flow" viewBox="0 0 320 430" role="img" aria-label="The MCP client talks to the server only through aegis mcp-jail. A changed tool is stopped at the jail.">
+  <g class="box"><rect x="60" y="10" width="200" height="72" rx="14" fill="var(--flow-box)" stroke="var(--flow-line)"/><text x="160" y="42" text-anchor="middle" class="flow-title">AI client</text><text x="160" y="64" text-anchor="middle" class="flow-sub">Claude Code, Codex</text></g>
+  <g class="box"><rect x="60" y="150" width="200" height="104" rx="16" fill="var(--flow-jail)"/><path d="M145 192v-10a15 15 0 0 1 30 0v10h-8v-8a7 7 0 0 0-14 0v8z" fill="var(--flow-mark)"/><text x="160" y="220" text-anchor="middle" class="flow-title on-jail">aegis mcp-jail</text><text x="160" y="240" text-anchor="middle" class="flow-sub on-jail">pins · filters · logs</text></g>
+  <g class="box"><rect x="60" y="322" width="200" height="72" rx="14" fill="var(--flow-box)" stroke="var(--flow-line)"/><text x="160" y="354" text-anchor="middle" class="flow-title">MCP server</text><text x="160" y="376" text-anchor="middle" class="flow-sub">sandboxed process</text></g>
+  <path d="M140 82V150M140 254V322" stroke="var(--flow-line)" stroke-width="2" stroke-dasharray="4 6"/>
+  <path d="M180 322V254M180 150V82" stroke="var(--flow-line)" stroke-width="2" stroke-dasharray="4 6"/>
+  <circle opacity="0" r="5" fill="var(--art-ok)"><animateMotion dur="3.2s" repeatCount="indefinite" path="M140 82V322" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" repeatCount="indefinite"/></circle>
+  <circle opacity="0" r="5" fill="var(--art-ok)"><animateMotion dur="3.2s" begin="1.6s" repeatCount="indefinite" path="M180 322V82" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" begin="1.6s" repeatCount="indefinite"/></circle>
+  <circle opacity="0" r="5" fill="var(--art-stop)"><animateMotion dur="4s" begin=".8s" repeatCount="indefinite" path="M200 322V256" keyPoints="0;1;1" keyTimes="0;.45;1" calcMode="linear"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.06;.75;1" dur="4s" begin=".8s" repeatCount="indefinite"/></circle>
+  <g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;.44;.5;.8;1" dur="4s" begin=".8s" repeatCount="indefinite"/><rect x="44" y="404" width="232" height="24" rx="12" fill="var(--flow-stop-bg)"/><text x="160" y="420" text-anchor="middle" class="flow-stop">changed tool: hidden, logged</text></g>
+</svg>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>
