@@ -136,7 +136,14 @@ def cmd_probe(args) -> int:
     project = _project(args)
     profile = _load_profile(project, args.profile, args.agent)
     task = Task(agent=args.agent or profile.agent, command=["true"])
-    result = run_probe(project, profile, phase=args.phase, task=task)
+    try:
+        result = run_probe(project, profile, phase=args.phase, task=task)
+    except RuntimeError as e:
+        hint = ""
+        if "remount" in str(e):
+            hint = ("\nThis usually means the project sits inside a directory the sandbox already mounts, such as "
+                    "Python's own install folder. Run the probe on a project somewhere else.")
+        raise SystemExit(f"aegis: the probe could not run: {" ".join(str(e).splitlines()[:2])[:300]}{hint}") from None
     regs = None
     if args.compare:
         prev = previous_probe(project, profile.name, result["run_id"])
