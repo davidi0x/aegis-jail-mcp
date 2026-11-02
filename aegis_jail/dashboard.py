@@ -65,11 +65,31 @@ def _runs(limit: int = 80) -> list[dict]:
             "changes": [{"path": c.get("path"), "kind": c.get("kind"), "risk": c.get("risk", "")} for c in d.get("changes", [])],
             "tripwires": d.get("tripwires", []), "blocked": blocked, "denials": hints[:12],
             "hidden": d.get("hidden", [])[:40], "workspace": (rep.parent / "workspace").exists(),
+            "failure": _failure(d),
             "prompt": ((d.get("task") or {}).get("prompt") or " ".join((d.get("task") or {}).get("command") or []))[:200],
             "duration": round(sum(p.get("duration", 0) for p in d.get("phases", [])), 2),
         })
     out.sort(key=lambda r: r["started"], reverse=True)
     return out[:limit]
+
+
+def _failure(d: dict) -> str:
+    """The last lines of the first failed phase's log: why a run failed, in the agent's own words."""
+    for ph in d.get("phases", []):
+        if ph.get("exit_code") == 0 and not ph.get("timed_out"):
+            continue
+        if ph.get("timed_out"):
+            return f"{ph.get('name')} timed out after {ph.get('duration')}s"
+        try:
+            with open(ph.get("log", ""), "rb") as f:
+                f.seek(0, 2)
+                f.seek(max(0, f.tell() - 1500))
+                tail = f.read().decode("utf-8", "replace")
+        except OSError:
+            tail = ""
+        lines = [ln for ln in tail.splitlines() if ln.strip()][-6:]
+        return f"{ph.get('name')} exited with code {ph.get('exit_code')}" + ("\n" + "\n".join(lines) if lines else "")
+    return ""
 
 
 def _activity(limit: int = 200) -> list[dict]:
@@ -165,10 +185,14 @@ def start_run(project: str, agent: str, prompt: str, known: list[str]) -> dict:
     prompt = prompt.strip()
     if not prompt or len(prompt) > 4000:
         raise ValueError("describe the task in a few words (up to 4000 characters)")
+    import os
     log = (watch.watch_dir() / "dashboard-runs.log").open("a", encoding="utf-8")
-    proc = subprocess.Popen([sys.executable, "-m", "aegis_jail", "run", "--project", project, "--agent", agent,
-                             "--prompt", prompt], stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                            cwd=project)
+    aegis, extra_env = watch.aegis_invocation()
+    env = dict(os.environ)
+    if extra_env.get("PYTHONPATH"):
+        env["PYTHONPATH"] = os.pathsep.join(x for x in (extra_env["PYTHONPATH"], env.get("PYTHONPATH")) if x)
+    proc = subprocess.Popen([*aegis, "run", "--project", project, "--agent", agent, "--prompt", prompt],
+                            stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, cwd=project, env=env)
     items = _active()
     items.append({"pid": proc.pid, "project": project, "agent": agent, "prompt": prompt[:200], "started": time.time()})
     watch._write_json(watch.watch_dir() / "active.json", items)

@@ -220,6 +220,8 @@ class Profile:
             env["USERPROFILE"] = str(home)
         env["TMPDIR"] = env["TMP"] = env["TEMP"] = str(tmp.resolve())
         env["AEGIS_SANDBOX"] = "1"
+        # Tools that refuse to drop their own permission prompts as root (Claude Code) accept it inside a sandbox.
+        env["IS_SANDBOX"] = "1"
         from aegis_jail import decoys
         home_hidden = not any(_is_within(home, gp) for gp in granted_paths)
         decoy_map = decoys.prepare(tmp, hidden_secrets, home_hidden)

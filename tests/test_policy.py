@@ -34,6 +34,7 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(expected_fs(spec.fs_rules, home / "x.txt", "write"), "deny")
         self.assertEqual(expected_fs(spec.fs_rules, Path("/usr/bin/env"), "write"), "deny")
         self.assertIsNone(spec.network)
+        self.assertEqual(spec.env.get("IS_SANDBOX"), "1")  # lets Claude Code run unattended as root, inside the jail
 
     def test_home_read_does_not_expose_secrets_or_project(self):
         spec = self.compile([Grant(id="home-read", kind="read", path="~")])

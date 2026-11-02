@@ -78,6 +78,7 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 const $ = (s) => document.querySelector(s);
+function put(el, ...kids) { el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false)); }
 function ago(t) {
   if (!t) return "never";
   const s = Math.max(0, Date.now() / 1000 - t);
@@ -89,7 +90,19 @@ function ago(t) {
 function when(t) { return t ? new Date(t * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""; }
 function dur(s) { if (!s && s !== 0) return ""; if (s < 60) return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`; return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s`; }
 function shortPath(p) { const parts = String(p || "").split(/[\\/]/).filter(Boolean); return parts.length > 2 ? "…/" + parts.slice(-2).join("/") : String(p || ""); }
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3400); }
+function toast(msg, kind = "ok") {
+  const t = $("#toast");
+  t.className = "toast " + kind;
+  t.replaceChildren(icon(kind === "err" ? "alert" : kind === "info" ? "info" : "check-circle"), h("span", {}, msg));
+  t.hidden = false; t.style.animation = "none"; void t.offsetWidth; t.style.animation = "";
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, kind === "err" ? 6000 : 3400);
+}
+async function busy(btn, fn) {
+  if (btn) { btn.disabled = true; btn.classList.add("busy"); }
+  try { return await fn(); }
+  catch (err) { toast(err.message, "err"); throw err; }
+  finally { if (btn && btn.isConnected) { btn.disabled = false; btn.classList.remove("busy"); } }
+}
 async function api(path) {
   const r = await fetch(path, { credentials: "same-origin" });
   if (r.status === 401) throw new Error("Session expired: open the link that `aegis dashboard` prints.");
@@ -223,12 +236,16 @@ function runBadge(r, small) {
   return r.ok ? h("span", { class: "badge b-ok" + c }, "Passed") : h("span", { class: "badge b-crit" + c }, "Failed");
 }
 function emptyState(title, text) { return h("div", { class: "empty" }, h("b", {}, title), h("span", {}, text)); }
+const lastVal = new Map();
 function countUp(el, value, key) {
-  if (REDUCED || counted.has(key) || !(value > 0)) { el.textContent = String(value); return; }
-  counted.add(key);
+  const from = lastVal.has(key) ? lastVal.get(key) : 0;
+  lastVal.set(key, value);
+  if (REDUCED || from === value) { el.textContent = String(value); return; }
   const t0 = performance.now();
-  const step = (t) => { const k = Math.min(1, (t - t0) / 900); el.textContent = String(Math.round(value * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); };
-  el.textContent = "0"; requestAnimationFrame(step);
+  const step = (t) => { const k = Math.min(1, (t - t0) / 900); el.textContent = String(Math.round(from + (value - from) * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); };
+  el.textContent = String(from); requestAnimationFrame(step);
+  if (counted.has(key)) { const card = () => el.closest(".tile, .card"); requestAnimationFrame(() => { const c = card(); if (c) { c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump"); } }); }
+  counted.add(key);
 }
 function tile(key, cls, label, iconName, value, suffix, sub, meter) {
   const num = h("span", {});
@@ -272,11 +289,8 @@ function buildPromptBars() {
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       const input = form.querySelector("input"), btn = form.querySelector(".send");
-      if (!input.value.trim()) { input.focus(); toast("Describe the task first"); return; }
-      btn.disabled = true;
-      try { const r = await post({ kind: "run", project: sel.value, agent: promptAgent, prompt: input.value }); input.value = ""; toast(r.message); await refresh(); }
-      catch (err) { toast(err.message); }
-      btn.disabled = false;
+      if (!input.value.trim()) { input.focus(); form.classList.remove("shake"); void form.offsetWidth; form.classList.add("shake"); toast("Describe the task first", "info"); return; }
+      await busy(btn, async () => { const r = await post({ kind: "run", project: sel.value, agent: promptAgent, prompt: input.value }); input.value = ""; toast(r.message); await refresh(); }).catch(() => {});
     };
   });
 }
@@ -299,12 +313,12 @@ function renderOverview() {
       ? h("select", { class: "proj-select proj-name", "aria-label": "Project", onchange: (e) => { store.set("aegis.project", e.target.value); render(); } },
         ...S.projects.map((x) => h("option", { value: x.path, selected: x.path === p.path ? "" : null }, x.name)))
       : h("div", { class: "proj-name" }, p.name);
-    card.replaceChildren(head, h("div", {}, name, h("div", { class: "run-sub", style: null }, shortPath(p.path))),
+    put(card, head, h("div", {}, name, h("div", { class: "run-sub", style: null }, shortPath(p.path))),
       h("div", { class: "chips" }, h("span", { class: "chip" }, ic("box"), `${c.jailed} / ${c.servers} jailed`),
         h("span", { class: "chip" }, ic("shield"), `${p.profiles.length} ${p.profiles.length === 1 ? "profile" : "profiles"}`),
         h("span", { class: "chip" }, ic("plug"), `${c.servers} MCP`)));
   } else {
-    card.replaceChildren(head, h("div", { class: "proj-name" }, "No project yet"), h("p", {}, "Open a folder in Claude Code or run aegis in it, and it shows up here."));
+    put(card, head, h("div", { class: "proj-name" }, "No project yet"), h("p", {}, "Open a folder in Claude Code or run aegis in it, and it shows up here."));
   }
   const runs = S.runs, passed = runs.filter((r) => r.ok).length, failed = runs.length - passed;
   $("#ov-tiles").replaceChildren(
@@ -366,14 +380,18 @@ async function doAct(e, action, btn) {
     ]);
     return;
   }
-  btn.disabled = true;
-  try { const r = await post({ kind: "event", id: e.id, action }); toast(r.message || "Done"); await refresh(); }
-  catch (err) { toast(err.message); btn.disabled = false; }
+  await busy(btn, async () => { const r = await post({ kind: "event", id: e.id, action }); await leave(btn); toast(r.message || "Done"); await refresh(); }).catch(() => {});
 }
 async function doResolve(e, status, btn) {
-  btn.disabled = true;
-  try { const r = await post({ kind: "resolve", id: e.id, status }); toast(r.message); await refresh(); }
-  catch (err) { toast(err.message); btn.disabled = false; }
+  const msg = { resolved: "Marked as handled", ignored: "Ignored", open: "Reopened" }[status];
+  await busy(btn, async () => { await post({ kind: "resolve", id: e.id, status }); if (filter === "open" || status === "open") await leave(btn); toast(msg); await refresh(); }).catch(() => {});
+}
+function leave(btn) {
+  const card = btn.closest(".event");
+  if (!card || REDUCED) return Promise.resolve();
+  card.style.height = card.offsetHeight + "px";
+  card.classList.add("leaving");
+  return new Promise((r) => setTimeout(r, 420));
 }
 function renderActivity() {
   let list = S.events;
@@ -397,17 +415,18 @@ function renderAgents() {
   const cur = $("#ag-current"), act = (S.active || [])[0], last = S.runs[0];
   if (act) {
     const el = Math.max(0, Date.now() / 1000 - act.started);
-    cur.replaceChildren(h("div", { class: "card-head" }, h("span", { class: "label" }, "Current agent run"), h("span", { class: "state ok" }, h("i", {}), "Running")),
+    put(cur, h("div", { class: "card-head" }, h("span", { class: "label" }, "Current agent run"), h("span", { class: "state ok" }, h("i", {}), "Running")),
       h("h2", { class: "card-title" }, `${agentName(act.agent)}: ${act.prompt}`),
       h("div", { class: "current-row" }, h("span", { class: "chip" }, h("span", { class: "mono-badge" }, AGENT_MONO[act.agent] || "?"), agentName(act.agent)), h("span", { class: "chip" }, ic("box"), "Profile: default"), h("span", { class: "chip" }, ic("folder"), shortPath(act.project))),
       h("div", { class: "progress indef" }, h("i", {})), h("div", { class: "tile-sub" }, `Working in the sandbox for ${dur(el)}. Its changes will wait for your review.`));
   } else if (last) {
-    cur.replaceChildren(h("div", { class: "card-head" }, h("span", { class: "label" }, "Latest agent run"), runBadge(last)),
+    put(cur, h("div", { class: "card-head" }, h("span", { class: "label" }, "Latest agent run"), runBadge(last)),
       h("h2", { class: "card-title" }, `${agentName(last.agent)}: ${last.prompt || last.id}`),
       h("div", { class: "current-row" }, h("span", { class: "chip" }, h("span", { class: "mono-badge" }, AGENT_MONO[last.agent] || "?"), agentName(last.agent)), h("span", { class: "chip" }, ic("shield"), `Profile: ${last.profile || "default"}`), h("span", { class: "chip" }, ic("clock"), dur(last.duration))),
+      last.failure ? h("div", { class: "fail-line" }, ic("alert"), last.failure.split("\n").slice(-1)[0]) : null,
       h("div", { class: "tile-sub" }, "No agent is running now. Describe a task in the bar below to start one."));
   } else {
-    cur.replaceChildren(h("span", { class: "label" }, "Current agent run"), h("h2", { class: "card-title" }, "Nothing running"), h("div", { class: "tile-sub" }, "Describe a task in the bar below to start an agent in the sandbox."));
+    put(cur, h("span", { class: "label" }, "Current agent run"), h("h2", { class: "card-title" }, "Nothing running"), h("div", { class: "tile-sub" }, "Describe a task in the bar below to start an agent in the sandbox."));
   }
   const recent = S.runs.slice(0, 50), passed = recent.filter((r) => r.ok).length;
   const pct = recent.length ? Math.round((passed / recent.length) * 100) : 0;
@@ -469,8 +488,8 @@ function renderMcp() {
   const em = $("#mcp-act-empty"); em.hidden = !!rows.length;
   if (!rows.length) em.replaceChildren(emptyState("No jailed traffic yet", "Calls through aegis mcp-jail are logged here."));
 }
-async function jail(s, btn) { btn.disabled = true; try { toast((await post({ kind: "jail", file: s.file, jsonpath: s.jsonpath })).message); await refresh(); } catch (e) { toast(e.message); btn.disabled = false; } }
-async function unjail(s, btn) { btn.disabled = true; try { toast((await post({ kind: "unjail", file: s.file, jsonpath: s.jsonpath })).message); await refresh(); } catch (e) { toast(e.message); btn.disabled = false; } }
+async function jail(s, btn) { await busy(btn, async () => { toast((await post({ kind: "jail", file: s.file, jsonpath: s.jsonpath })).message); await refresh(); }).catch(() => {}); }
+async function unjail(s, btn) { await busy(btn, async () => { toast((await post({ kind: "unjail", file: s.file, jsonpath: s.jsonpath })).message, "info"); await refresh(); }).catch(() => {}); }
 
 // ------------------------------------------------------------------ autopilot, boundaries, setup
 function renderAutopilot() {
@@ -484,7 +503,7 @@ function renderAutopilot() {
 $("#ap-form").addEventListener("change", async (ev) => {
   const el = ev.target; if (!el.dataset.key) return;
   const value = el.type === "checkbox" ? el.checked : el.dataset.key === "interval" ? Number(el.value) : el.value;
-  try { await post({ kind: "config", updates: { [el.dataset.key]: value } }); toast("Saved"); await refresh(); } catch (err) { toast(err.message); }
+  try { await post({ kind: "config", updates: { [el.dataset.key]: value } }); toast("Setting saved"); el.closest(".setting")?.classList.add("saved"); setTimeout(() => el.closest(".setting")?.classList.remove("saved"), 900); await refresh(); } catch (err) { toast(err.message, "err"); }
 });
 function renderSetup() {
   const s = S.setup;
@@ -508,6 +527,7 @@ async function openRun(r) {
   add("Task", r.prompt || "(none)"); add("Project", r.project); add("Agent", agentName(r.agent)); add("Profile", r.profile || "default");
   add("Sandbox", r.backend); add("Started", when(r.started)); add("Duration", dur(r.duration)); add("Status", r.status);
   const parts = [dl];
+  if (r.failure) parts.push(h("h3", {}, "Why it failed"), h("div", { class: "terminal err" }, h("pre", {}, r.failure)));
   if (r.tripwires.length) parts.push(h("h3", {}, "Tripwire"), h("div", { class: "terminal" }, h("pre", {}, r.tripwires.join("\n"))));
   if (r.blocked.length || r.denials.length) parts.push(h("h3", {}, "Blocked"), h("div", { class: "terminal" }, h("pre", {}, [...r.blocked, ...r.denials].join("\n"))));
   const pre = h("pre", { class: "diff" }, "Loading the diff…");
@@ -582,7 +602,10 @@ function render() {
   paintIcons(); paintMascots();
   seenEvents = new Set(S.events.map((e) => e.id));
 }
-async function refresh() { try { S = await api("/api/state"); render(); } catch (err) { toast(err.message); } }
+async function refresh() {
+  try { S = await api("/api/state"); document.body.classList.remove("loading"); $("#offline").hidden = true; render(); }
+  catch (err) { const o = $("#offline"); o.querySelector("span").textContent = err.message.startsWith("Session") ? err.message : "Aegis is not reachable. Is `aegis dashboard` or `aegis watch` still running?"; o.hidden = false; }
+}
 
 document.addEventListener("click", (e) => {
   const c = e.target.closest(".copy"); if (c) copy(c.dataset.copy);
@@ -595,16 +618,25 @@ document.querySelectorAll(".filter button").forEach((b) => b.addEventListener("c
 }));
 $("#btn-refresh").addEventListener("click", async (e) => {
   const b = e.currentTarget; b.classList.remove("spin"); void b.offsetWidth; b.classList.add("spin");
-  try { toast((await post({ kind: "scan" })).message); await refresh(); } catch (err) { toast(err.message); }
+  await busy(b, async () => { toast((await post({ kind: "scan" })).message, "info"); await refresh(); }).catch(() => {});
 });
 window.addEventListener("hashchange", route);
 let resizeT;
 window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(paintArt, 150); });
 
+function skeleton() {
+  const sk = (n, cls) => Array.from({ length: n }, () => h("div", { class: "card skel " + cls }));
+  $("#ov-tiles").replaceChildren(...sk(4, "tile")); $("#mcp-tiles").replaceChildren(...sk(4, "tile"));
+  $("#ov-runs").replaceChildren(...Array.from({ length: 3 }, () => h("div", { class: "skel-row" })));
+  $("#act-list").replaceChildren(...sk(3, "skel-event"));
+}
+$("#offline-retry").addEventListener("click", (e) => busy(e.currentTarget, refresh));
+document.body.classList.add("loading"); skeleton();
 paintIcons(); paintMascots(); route(); refresh();
 try {
   let deb;
   const es = new EventSource("/api/stream");
   es.onmessage = () => { clearTimeout(deb); deb = setTimeout(refresh, 250); };
+  es.onerror = () => { setTimeout(refresh, 1500); };
 } catch { setInterval(refresh, 5000); }
 setInterval(() => { if (S && (S.active || []).length) refresh(); else if (S) renderStatus(); }, 15000);

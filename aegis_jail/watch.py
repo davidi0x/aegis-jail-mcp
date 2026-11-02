@@ -283,9 +283,21 @@ def mcp_servers() -> list[dict]:
     return out
 
 
-def _aegis_command() -> list[str]:
+def aegis_invocation() -> tuple[list[str], dict]:
+    """How to start *this* copy of Aegis from another process: (argv prefix, extra environment).
+
+    From a source checkout, `python -m aegis_jail` alone could import a different, installed copy, so the
+    checkout is put first on PYTHONPATH. An installed copy uses the `aegis` entry point when it exists.
+    """
+    here = Path(__file__).resolve().parent
+    if not any(part in ("site-packages", "dist-packages") for part in here.parts):
+        return [sys.executable, "-m", "aegis_jail"], {"PYTHONPATH": str(here.parent)}
     exe = shutil.which("aegis")
-    return [exe] if exe else [sys.executable, "-m", "aegis_jail"]
+    return ([exe] if exe else [sys.executable, "-m", "aegis_jail"]), {}
+
+
+def _aegis_command() -> list[str]:
+    return aegis_invocation()[0]
 
 
 def _get_in(data: dict, jp: list[str]) -> dict:
@@ -306,7 +318,7 @@ def jail_server(file: str, jsonpath: list[str]) -> dict:
         raise ValueError("remote (URL) MCP servers cannot be sandboxed locally; review them instead")
     original = json.loads(json.dumps(entry))
     name = jsonpath[-1]
-    aegis = _aegis_command()
+    aegis, extra_env = aegis_invocation()
     args = aegis[1:] + ["mcp-jail", "--name", name]
     env = entry.get("env") or {}
     if env:
@@ -316,6 +328,8 @@ def jail_server(file: str, jsonpath: list[str]) -> dict:
     args += ["--", str(entry["command"]), *[str(a) for a in entry.get("args") or []]]
     entry["command"] = aegis[0]
     entry["args"] = args
+    if extra_env:
+        entry["env"] = {**env, **extra_env}
     backups = watch_dir() / "backups"
     backups.mkdir(exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -338,6 +352,11 @@ def unjail_server(file: str, jsonpath: list[str]) -> dict:
     parent[jsonpath[-1]] = store.pop(key)["entry"]
     _write_json(path, data)
     _write_json(watch_dir() / "originals.json", store)
+    # The server runs with full rights again, so the event that flagged it is open again.
+    for e in all_events():
+        d = e.get("data") or {}
+        if e["kind"] == "mcp_unjailed" and d.get("file") == file and d.get("jsonpath") == list(jsonpath) and e["status"] != "open":
+            resolve(e["id"], "open")
     return {"changed": True}
 
 
@@ -539,17 +558,23 @@ RESPONDER_PROMPT = (
 
 
 def responder_command(agent: str) -> list[str]:
-    aegis = _aegis_command()
+    aegis, extra_env = aegis_invocation()
     if agent == "claude":
-        cfg = {"mcpServers": {"aegis": {"command": aegis[0], "args": aegis[1:] + ["mcp-server"]}}}
+        server = {"command": aegis[0], "args": aegis[1:] + ["mcp-server"]}
+        if extra_env:
+            server["env"] = extra_env
+        cfg = {"mcpServers": {"aegis": server}}
         cfg_path = watch_dir() / "responder-mcp.json"
         _write_json(cfg_path, cfg)
         allowed = ",".join(f"mcp__aegis__{t}" for t in RESPONDER_TOOLS)
         return ["claude", "-p", RESPONDER_PROMPT, "--mcp-config", str(cfg_path), "--strict-mcp-config",
                 "--allowedTools", allowed]
     if agent == "codex":
+        extra = []
+        if extra_env:
+            extra = ["-c", "mcp_servers.aegis.env={" + ", ".join(f"{k} = {json.dumps(v)}" for k, v in extra_env.items()) + "}"]
         return ["codex", "exec", "-c", f"mcp_servers.aegis.command={json.dumps(aegis[0])}",
-                "-c", f"mcp_servers.aegis.args={json.dumps(aegis[1:] + ['mcp-server'])}", RESPONDER_PROMPT]
+                "-c", f"mcp_servers.aegis.args={json.dumps(aegis[1:] + ['mcp-server'])}", *extra, RESPONDER_PROMPT]
     raise ValueError(agent)
 
 

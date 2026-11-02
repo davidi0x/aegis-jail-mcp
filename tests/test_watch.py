@@ -65,11 +65,12 @@ class WatchTest(WatchBase):
         self.assertIn("mcp-jail", entry["args"])
         self.assertEqual(entry["args"][entry["args"].index("--pass-env") + 1], "GITHUB_TOKEN")
         self.assertEqual(entry["args"][-2:], ["npx", "server-github"])
-        self.assertEqual(entry["env"], {"GITHUB_TOKEN": "x"})
+        self.assertEqual(entry["env"]["GITHUB_TOKEN"], "x")  # the user's variables are kept
         self.assertEqual(watch.get_event(ev.id)["status"], "resolved")
         watch.unjail_server(str(self.home / ".claude.json"), ["mcpServers", "gh"])
         entry = json.loads((self.home / ".claude.json").read_text())["mcpServers"]["gh"]
         self.assertEqual(entry["command"], "npx")
+        self.assertEqual(watch.get_event(ev.id)["status"], "open")  # undo brings the warning back
 
     def test_auto_jail(self):
         watch.save_config({"auto_jail": True})
