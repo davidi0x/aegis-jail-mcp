@@ -297,11 +297,8 @@ def before_after() -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--demo"), ap.add_argument("--optimize"), ap.add_argument("--scan"), ap.add_argument("--probe")
-    ap.add_argument("--png", action="store_true", help="also render PNGs with Playwright")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "banner.svg").write_text(banner(), encoding="utf-8")
-    (OUT / "social-preview.svg").write_text(banner(1280, 640), encoding="utf-8")
     (OUT / "architecture.svg").write_text(architecture(), encoding="utf-8")
     (OUT / "pipeline.svg").write_text(pipeline(), encoding="utf-8")
     (OUT / "mcp-jail.svg").write_text(mcp_jail(), encoding="utf-8")
@@ -329,16 +326,6 @@ def main() -> None:
         terminal(["$ aegis scan ./untrusted-repo", ""] + body[:21] + ["        ... and 3 more findings"],
                  "aegis scan: what could hijack an agent in this repo?", "scan.svg")
     print("wrote", ", ".join(sorted(p.name for p in OUT.glob("*.svg"))))
-    if a.png:
-        import subprocess
-        import tempfile
-        js = """const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();
-        const pg=await b.newPage({viewport:{width:1280,height:640}});
-        await pg.goto('file://'+process.argv[2]);await pg.screenshot({path:process.argv[3]});await b.close();})();"""
-        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
-            f.write(js)
-        subprocess.run(["node", f.name, str(OUT / "social-preview.svg"), str(OUT / "social-preview.png")], check=True)
-        print("wrote social-preview.png (upload it in Settings -> Social preview)")
 
 
 if __name__ == "__main__":

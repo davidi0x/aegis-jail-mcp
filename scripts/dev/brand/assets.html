@@ -1,0 +1,72 @@
+<!doctype html><meta charset=utf-8>
+<style>
+@font-face{font-family:Figtree;src:url(../../../aegis_jail/web/fonts/figtree.woff2);font-weight:300 900}
+@font-face{font-family:JB;src:url(../../../aegis_jail/web/fonts/jetbrains-mono.woff2);font-weight:100 800}
+*{box-sizing:border-box;margin:0}
+body{font-family:Figtree;color:#0e0c15;background:#f1edfd}
+.m-lines,.m-speed{}
+.frame{position:relative;overflow:hidden;background:linear-gradient(135deg,#f4f0ff,#e3d9ff)}
+.banner{width:1280px;height:400px;padding:56px 64px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:30px;letter-spacing:-.03em}
+.logo small{display:block;font:600 10px JB;letter-spacing:.32em;color:#6e6880;margin-top:-2px}
+h1{font-size:68px;line-height:.98;letter-spacing:-.045em;font-weight:800;margin:26px 0 18px}
+h1 em{font-style:normal;color:#7c5cff}
+p.sub{font-size:21px;color:#3b3747;max-width:640px;line-height:1.35}
+.chips{display:flex;gap:10px;margin-top:24px}
+.chip{font:600 15px Figtree;padding:9px 16px;border-radius:99px;background:#fff;box-shadow:0 8px 20px -10px #4c34a859}
+.chip.d{background:#0e0c15;color:#f6f3ff}
+.card{width:380px;height:320px;border-radius:34px;background:linear-gradient(160deg,#a58bff,#6c48ff);display:grid;place-items:center;box-shadow:0 30px 60px -24px #4c34a8a0}
+.card svg{width:340px}
+.m-lines{stroke:#0e0c15}
+/* explainer */
+.how{width:1280px;padding:56px 64px 64px}
+.how h2{font-size:46px;letter-spacing:-.04em;font-weight:800}
+.how .lead{font-size:20px;color:#3b3747;margin:8px 0 34px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.step{border-radius:28px;padding:26px;height:318px;position:relative}
+.step b{font:600 12px JB;letter-spacing:.2em}
+.step h3{font-size:30px;line-height:1.02;letter-spacing:-.03em;margin:16px 0 12px;font-weight:800}
+.step p{font-size:16px;line-height:1.4;color:#2a2636}
+.step code{position:absolute;left:20px;right:20px;bottom:20px;background:#121019;color:#f6f3ff;border-radius:14px;padding:11px 14px;font:500 13px JB}
+.s1{background:linear-gradient(160deg,#ece4ff,#c9b6ff)}.s2{background:linear-gradient(160deg,#fff7b0,#f8e15a)}
+.s3{background:linear-gradient(160deg,#ffc1b6,#ff8574)}.s4{background:linear-gradient(160deg,#f3ffbf,#cdf063)}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:18px}
+.mini{background:#121019;color:#f6f3ff;border-radius:26px;padding:24px 26px}
+.mini h4{font-size:20px;letter-spacing:-.02em;margin-bottom:6px}.mini p{font-size:15px;color:#b9b2cc;line-height:1.4}
+.mini i{font:600 11px JB;letter-spacing:.2em;color:#a58bff;font-style:normal;display:block;margin-bottom:10px}
+/* social */
+.social{width:1280px;height:640px;padding:84px 88px;display:flex;justify-content:space-between;align-items:center}
+.social h1{font-size:78px;white-space:nowrap}.social p.sub{font-size:26px;max-width:640px}
+.social .card{width:380px;height:420px}.social .card svg{width:340px}
+</style>
+<div id=root></div>
+<script src="mascot.js"></script>
+<script>
+const q=new URLSearchParams(location.search).get('k');
+const logo=`<svg width="44" height="44" viewBox="0 0 44 44"><path d="M5 40V22C5 11 12 4 22 4s17 7 17 18v18H28V23c0-4-2-7-6-7s-6 3-6 7v17z" fill="#0e0c15"/></svg>`;
+const hd=`<div class=logo>${logo}<div>aegis<small>JAIL MCP</small></div></div>`;
+let h='';
+if(q==='banner'||q==='social'){
+ h=`<div class="frame ${q}" id=cap>
+ <div>${hd}<h1>Give agents room<br><em>Set the boundaries</em></h1>
+ <p class=sub>${q==='banner'?'A sandbox for AI agents and MCP servers. They get a copy of your project and nothing else.':'A secure jail for AI agents and MCP servers. They get a copy of your project and nothing else.'}</p>
+ ${q==='banner'?'<div class=chips><span class="chip d">Linux · macOS · Windows</span><span class=chip>Zero dependencies</span><span class=chip>Claude Code plugin</span><span class=chip>MCP server</span></div>':''}</div>
+ <div class=card>${mascot('lock')}</div></div>`;
+}else{
+ h=`<div class="frame how" id=cap>
+ <h2>How Aegis protects you</h2>
+ <p class=lead>Four steps, the same on Linux, macOS and Windows. Nothing reaches your real files until you say yes.</p>
+ <div class=steps>
+ <div class="step s1"><b>01 · COPY</b><h3>The agent gets a copy</h3><p>Your project, without .env files, SSH keys or cloud credentials.</p><code>aegis run</code></div>
+ <div class="step s2"><b>02 · JAIL</b><h3>It runs in a sandbox</h3><p>No home directory, no secrets, no network except hosts you allow.</p><code>bubblewrap · Seatbelt · AppContainer</code></div>
+ <div class="step s3"><b>03 · WATCH</b><h3>Hijacks get caught</h3><p>Decoy keys sit where real ones were. Touch one and a tripwire fires.</p><code>tripwire: ~/.aws/credentials</code></div>
+ <div class="step s4"><b>04 · REVIEW</b><h3>You decide</h3><p>See the diff. Risky files need an explicit yes. Or discard everything.</p><code>aegis diff · apply · discard</code></div>
+ </div>
+ <div class=row>
+ <div class=mini><i>PROBE</i><h4>Checks the walls</h4><p>Tries to break out from inside, then tells you what got through.</p></div>
+ <div class=mini><i>MCP JAIL</i><h4>Firewall for tools</h4><p>Sandboxes any MCP server, pins tool definitions, blocks rug pulls.</p></div>
+ <div class=mini><i>AUTOPILOT</i><h4>Works in the background</h4><p>Claude Code or Codex handle detections through Aegis MCP on their own.</p></div>
+ </div></div>`;
+}
+root.innerHTML=h;
+</script>

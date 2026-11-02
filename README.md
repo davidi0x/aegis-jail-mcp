@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="Aegis Jail MCP: give AI agents a task, not your whole computer" width="100%">
+  <img src="docs/images/banner.png" alt="Aegis Jail MCP: give AI agents a task, not your whole computer" width="100%">
 </p>
 
 <p align="center">
@@ -50,6 +50,10 @@ On top of the sandbox, Aegis does three things that plain sandboxes don't:
 | **It notices a hijacked agent** | Fake credentials ("decoys") sit where your real ones were hidden. If an agent reads and tries to send them, Aegis raises a **tripwire** instead of guessing. |
 
 Aegis is a command-line tool, a **Claude Code plugin** and an **MCP server**. It needs only Python 3.10+ and has **zero dependencies**.
+
+<p align="center">
+  <img src="docs/images/how-it-works.png" alt="How Aegis protects you: the agent gets a copy of the project, runs in a sandbox, hijack attempts are caught by decoys, and you review the diff before anything is applied" width="100%">
+</p>
 
 ## Why it exists
 

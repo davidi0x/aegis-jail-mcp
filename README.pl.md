@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="Aegis Jail MCP: daj agentom AI zadanie, a nie cały komputer" width="100%">
+  <img src="docs/images/banner.png" alt="Aegis Jail MCP: daj agentom AI zadanie, a nie cały komputer" width="100%">
 </p>
 
 <p align="center">
@@ -50,6 +50,10 @@ Poza samą piaskownicą Aegis robi trzy rzeczy, których zwykłe piaskownice nie
 | **Zauważa przejętego agenta** | W miejscu ukrytych kluczy leżą fałszywe ("wabiki"). Jeśli agent je przeczyta i spróbuje wysłać, Aegis podnosi **alarm** (tripwire), zamiast zgadywać. |
 
 Aegis to narzędzie wiersza poleceń, **wtyczka do Claude Code** i **serwer MCP**. Wymaga tylko Pythona 3.10+ i nie ma **żadnych zależności**.
+
+<p align="center">
+  <img src="docs/images/how-it-works.png" alt="Jak działa Aegis: agent dostaje kopię projektu, działa w piaskownicy, próby przejęcia wykrywają wabiki, a zmiany przeglądasz przed zastosowaniem" width="100%">
+</p>
 
 ## Po co to jest
 
